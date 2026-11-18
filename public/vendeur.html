@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Espace vendeur – CREALIVE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0F0F11;--card:#17171A;--line:#2A2A2E;--edge:#3A3A3F;--ink:#F2EFE9;--mute:#A5A29B;--gold:#C9A96E;--err:#E5877F}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Inter,Arial,sans-serif}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 32px;border-bottom:1px solid var(--line)}
+.logo{font-family:'Cormorant Garamond',Georgia,serif;font-size:24px;font-weight:600;letter-spacing:.22em}
+main{max-width:720px;margin:0 auto;padding:40px 20px 80px}
+h1{font-family:'Cormorant Garamond',Georgia,serif;font-weight:500;font-size:42px;line-height:1.1;margin:0 0 8px}
+h2{font-family:'Cormorant Garamond',Georgia,serif;font-weight:500;font-size:28px;margin:0}
+p{margin:0}.mute{color:var(--mute)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:4px;padding:24px;margin-top:24px}
+label{display:block;font-size:14px;color:var(--mute);margin:16px 0 6px}
+input,textarea,select{width:100%;background:var(--bg);color:var(--ink);border:1px solid var(--edge);border-radius:2px;padding:12px;font:inherit}
+textarea{min-height:90px;resize:vertical}
+button{font:inherit;font-weight:600;min-height:44px;padding:10px 18px;border-radius:2px;cursor:pointer}
+button:disabled{opacity:.45;cursor:not-allowed}
+.primary{background:var(--gold);color:#1A1405;border:0}
+.ghost{background:transparent;color:var(--ink);border:1px solid var(--edge)}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:20px}
+.msg{margin-top:12px;font-size:14px;min-height:20px}.err{color:var(--err)}.ok{color:var(--gold)}
+.bar{height:4px;background:var(--line);margin-top:12px}.bar i{display:block;height:100%;background:var(--gold);width:0}
+.item{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:16px 0;border-top:1px solid var(--line)}
+.item:first-of-type{border-top:0}
+.info{display:flex;gap:14px;min-width:0;flex:1 1 260px}
+.info img{width:64px;height:64px;object-fit:cover;border-radius:2px;border:1px solid var(--line)}
+.title{font-weight:600;overflow-wrap:anywhere}
+.badge{border:1px solid var(--gold);color:var(--gold);font-size:12px;padding:2px 10px;border-radius:999px}
+.badge.draft{border-color:var(--edge);color:var(--mute)}
+.acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.acts button{min-height:40px;padding:6px 14px}
+[hidden]{display:none!important}
+@media (max-width:520px){header{padding:16px 20px}h1{font-size:34px}}
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">CREALIVE</span>
+  <button id="out" class="ghost" hidden>Se déconnecter</button>
+</header>
+<main>
+  <section id="auth">
+    <h1>Espace vendeur</h1>
+    <p class="mute">Connectez-vous pour publier vos articles. Les 15 premiers sont gratuits.</p>
+    <div class="card">
+      <label for="email">Adresse e-mail</label>
+      <input id="email" type="email" autocomplete="email">
+      <label for="pwd">Mot de passe (6 caractères minimum)</label>
+      <input id="pwd" type="password" autocomplete="current-password" minlength="6">
+      <div class="row">
+        <button id="login" class="primary">Se connecter</button>
+        <button id="signup" class="ghost">Créer mon compte</button>
+      </div>
+      <p id="amsg" class="msg" role="status"></p>
+    </div>
+  </section>
+
+  <section id="app" hidden>
+    <h1>Mes articles</h1>
+    <p id="count" class="mute"></p>
+    <div class="bar"><i id="fill"></i></div>
+
+    <form id="form" class="card">
+      <h2>Ajouter un article</h2>
+      <label for="title">Nom de l’article</label>
+      <input id="title" required maxlength="120">
+      <label for="price">Prix en euros</label>
+      <input id="price" required inputmode="decimal" placeholder="25,00">
+      <label for="desc">Description</label>
+      <textarea id="desc" maxlength="2000"></textarea>
+      <label for="img">Lien de la photo (facultatif)</label>
+      <input id="img" type="url" placeholder="https://…">
+      <label for="status">Statut</label>
+      <select id="status">
+        <option value="draft">Brouillon (invisible pour les acheteurs)</option>
+        <option value="published">Publié (visible pour les acheteurs)</option>
+      </select>
+      <div class="row"><button id="add" class="primary" type="submit">Ajouter l’article</button></div>
+      <p id="fmsg" class="msg" role="status"></p>
+    </form>
+
+    <div class="card">
+      <h2>Ma boutique</h2>
+      <div id="list"></div>
+    </div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL = 'https://zxmyyltezdzsusjcdtfw.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Gs8P8oR7wcYMshCgWSc31Q_GZ5Nw8Vc';
+const MAX = 15;
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const $ = (id) => document.getElementById(id);
+let me = null;
+
+function say(id, text, kind) { const e = $(id); e.textContent = text; e.className = 'msg ' + (kind || ''); }
+function money(c) { return (c / 100).toLocaleString('fr-BE', { style: 'currency', currency: 'EUR' }); }
+
+db.auth.onAuthStateChange((_event, session) => {
+  me = session ? session.user.id : null;
+  $('auth').hidden = !!session;
+  $('app').hidden = !session;
+  $('out').hidden = !session;
+  if (session) load();
+});
+
+$('login').onclick = async () => {
+  say('amsg', '');
+  const { error } = await db.auth.signInWithPassword({ email: $('email').value.trim(), password: $('pwd').value });
+  if (error) say('amsg', 'Connexion impossible : ' + error.message, 'err');
+};
+$('signup').onclick = async () => {
+  say('amsg', '');
+  const { data, error } = await db.auth.signUp({ email: $('email').value.trim(), password: $('pwd').value });
+  if (error) say('amsg', 'Création impossible : ' + error.message, 'err');
+  else if (!data.session) say('amsg', 'Compte créé. Confirmez votre adresse e-mail grâce au message reçu, puis connectez-vous.', 'ok');
+};
+$('out').onclick = () => db.auth.signOut();
+
+async function load() {
+  const { data, error } = await db.from('articles').select('*').eq('seller_id', me).order('created_at', { ascending: false });
+  if (error) { say('fmsg', error.message, 'err'); return; }
+  const n = data.length;
+  $('count').textContent = n + ' sur ' + MAX + ' articles gratuits utilisés';
+  $('fill').style.width = Math.min(100, (n / MAX) * 100) + '%';
+  $('add').disabled = n >= MAX;
+  if (n >= MAX) say('fmsg', 'Limite atteinte. Pour publier davantage d’articles, il faudra passer à l’offre payante.', 'err');
+
+  const list = $('list');
+  list.replaceChildren();
+  if (!n) {
+    const p = document.createElement('p');
+    p.className = 'mute';
+    p.textContent = 'Aucun article pour l’instant. Ajoutez votre premier article ci-dessus.';
+    list.append(p);
+    return;
+  }
+  data.forEach((a) => {
+    const item = document.createElement('div'); item.className = 'item';
+    const info = document.createElement('div'); info.className = 'info';
+    if (a.image_url) { const im = document.createElement('img'); im.src = a.image_url; im.alt = a.title; info.append(im); }
+    const txt = document.createElement('div');
+    const t = document.createElement('div'); t.className = 'title'; t.textContent = a.title;
+    const pr = document.createElement('div'); pr.className = 'mute'; pr.textContent = money(a.price_cents);
+    txt.append(t, pr);
+    if (a.description) { const d = document.createElement('div'); d.className = 'mute'; d.textContent = a.description; txt.append(d); }
+    info.append(txt);
+
+    const acts = document.createElement('div'); acts.className = 'acts';
+    const b = document.createElement('span'); b.className = 'badge' + (a.status === 'published' ? '' : ' draft');
+    b.textContent = a.status === 'published' ? 'Publié' : 'Brouillon';
+    const tog = document.createElement('button'); tog.className = 'ghost';
+    tog.textContent = a.status === 'published' ? 'Retirer' : 'Publier';
+    tog.onclick = async () => {
+      const { error: e } = await db.from('articles').update({ status: a.status === 'published' ? 'draft' : 'published' }).eq('id', a.id);
+      if (e) say('fmsg', e.message, 'err'); else load();
+    };
+    const del = document.createElement('button'); del.className = 'ghost'; del.textContent = 'Supprimer';
+    del.onclick = async () => {
+      if (!confirm('Supprimer cet article ?')) return;
+      const { error: e } = await db.from('articles').delete().eq('id', a.id);
+      if (e) say('fmsg', e.message, 'err'); else { say('fmsg', ''); load(); }
+    };
+    acts.append(b, tog, del);
+    item.append(info, acts);
+    list.append(item);
+  });
+}
+
+$('form').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const euros = parseFloat($('price').value.replace(',', '.'));
+  if (!isFinite(euros) || euros < 0) { say('fmsg', 'Entrez un prix valide, par exemple 25,00.', 'err'); return; }
+  const row = {
+    title: $('title').value.trim(),
+    description: $('desc').value.trim() || null,
+    price_cents: Math.round(euros * 100),
+    image_url: $('img').value.trim() || null,
+    status: $('status').value
+  };
+  const { error } = await db.from('articles').insert(row);
+  if (error) { say('fmsg', error.message, 'err'); return; }
+  $('form').reset();
+  say('fmsg', 'Article ajouté.', 'ok');
+  load();
+});
+</script>
+</body>
+</html>
