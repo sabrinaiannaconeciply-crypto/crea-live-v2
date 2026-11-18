@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>La Boutique - CREALIVE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#0F0F11; --card:#17171A; --line:#2A2A30; --text:#F2F2F2; --muted:#9A9AA5; --gold:#D4B26A; }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif;}
+  header{display:flex;align-items:center;justify-content:space-between;padding:20px 40px;border-bottom:1px solid var(--line);}
+  .logo{font-family:'Cormorant Garamond',serif;font-size:24px;letter-spacing:2px;color:var(--text);text-decoration:none;}
+  .logo span{color:var(--gold);}
+  header a{color:var(--muted);text-decoration:none;font-size:14px;}
+  header a:hover{color:var(--text);}
+  main{max-width:1000px;margin:0 auto;padding:40px 20px;}
+  h1{font-family:'Cormorant Garamond',serif;font-size:36px;margin:0 0 10px;}
+  .subtitle{color:var(--muted);margin-bottom:30px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:20px;}
+  .product-card{background:var(--card);border:1px solid var(--line);border-radius:8px;overflow:hidden;display:flex;flex-direction:column;}
+  .product-image{width:100%;height:200px;object-fit:cover;background:var(--line);display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:50px;color:var(--gold);}
+  .product-info{padding:15px;display:flex;flex-direction:column;gap:5px;flex-grow:1;}
+  .product-title{font-weight:600;font-size:16px;}
+  .product-price{color:var(--gold);font-size:15px;font-weight:600;}
+  .product-desc{color:var(--muted);font-size:13px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/" class="logo">CRÉA<span>LIVE</span></a>
+  <a href="/vendeur.html">Espace vendeur</a>
+</header>
+
+<main>
+  <h1>La boutique</h1>
+  <p class="subtitle">Les créations et les trouvailles de nos vendeurs, choisies avec soin.</p>
+  
+  <div id="products-grid" class="grid">
+    <div style="color:var(--muted)">Chargement des articles...</div>
+  </div>
+</main>
+
+<script type="module">
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+  // Ta configuration Supabase
+  const supabaseUrl = 'https://zxmytezdzsusjcdtfw.supabase.co'; 
+  // Remplace la ligne ci-dessous par ta clé publique (sb_publishable_...)
+  const supabaseKey = 'sb_publishable_Gs8P8oR7wcYMshCgWSc31Q_GZ5Nw8Vc; 
+  
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
+  async function loadProducts() {
+    const { data, error } = await supabase
+      .from('articles')
+      .select('*')
+      .eq('status', 'published');
+
+    const grid = document.getElementById('products-grid');
+    
+    if (error) {
+      grid.innerHTML = '<p style="color:red;">Impossible de charger les articles. Erreur: ' + error.message + '</p>';
+      return;
+    }
+
+    if (data.length === 0) {
+      grid.innerHTML = '<p style="color:var(--muted);">Aucun article publié pour le moment.</p>';
+      return;
+    }
+
+    grid.innerHTML = data.map(article => `
+      <div class="product-card">
+        ${article.image_url 
+          ? `<img src="${article.image_url}" alt="${article.title}" class="product-image" onerror="this.outerHTML='<div class=\\'product-image\\'>${article.title.charAt(0).toUpperCase()}</div>'">` 
+          : `<div class="product-image">${article.title.charAt(0).toUpperCase()}</div>`
+        }
+        <div class="product-info">
+          <div class="product-title">${article.title}</div>
+          <div class="product-price">${(article.price_cents / 100).toFixed(2)} €</div>
+          <div class="product-desc">${article.description || ''}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  loadProducts();
+</script>
+
+</body>
+</html>
