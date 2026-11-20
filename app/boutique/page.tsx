@@ -260,3 +260,21 @@ export default function BoutiqueAcheteurPage() {
                       Disponible : {p.stock} en stock
                     </p>
                   </div>
+                </div>
+                <div className="p-5 pt-0">
+                  <button
+                    onClick={() => addToCart(p)}
+                    disabled={p.stock <= 0}
+                    className="w-full bg-stone-900 text-white font-semibold py-3 rounded-xl hover:bg-stone-800 transition disabled:opacity-40"
+                  >
+                    {p.stock <= 0 ? "Épuisé" : "Ajouter au panier"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
