@@ -281,3 +281,40 @@ export default function VendeurPage() {
                   </div>
                 ) : (
                   <div className="grid sm:grid-cols-2 gap-6">
+                                        {products.map((p) => (
+                      <div
+                        key={p.id}
+                        className="bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-sm"
+                      >
+                        {p.image_url ? (
+                          <img src={p.image_url} alt={p.title} className="w-full h-40 object-cover" />
+                        ) : (
+                          <div className="w-full h-40 bg-stone-100 flex items-center justify-center text-stone-400 text-sm">
+                            Pas de photo
+                          </div>
+                        )}
+                        <div className="p-4">
+                          <h3 className="font-bold text-stone-900">{p.title}</h3>
+                          <p className="text-amber-600 font-extrabold">
+                            {(p.price_cents / 100).toFixed(2)} €
+                          </p>
+                          <p className="text-xs text-stone-500 mt-1">En stock : {p.stock}</p>
+                          <button
+                            onClick={() => handleDelete(p.id)}
+                            className="mt-3 text-xs bg-red-50 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-100 font-medium"
+                          >
+                            Retirer de mon stock
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </main>
+    </div>
+  );
+}
