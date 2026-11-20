@@ -11,12 +11,18 @@ export default function HomePage() {
           <Link href="/" className="text-xl font-extrabold tracking-tight text-stone-900">
             CRÉA-LIVE <span className="text-amber-600">MARKET</span>
           </Link>
-          <nav className="flex items-center gap-6 text-sm font-medium">
+          <nav className="flex items-center gap-5 text-sm font-medium">
             <Link href="/boutique" className="text-stone-700 hover:text-amber-600 transition">
-              Boutique (Clients)
+              Boutique
             </Link>
             <Link href="/vendeur" className="text-stone-700 hover:text-amber-600 transition">
               Espace Vendeur
+            </Link>
+            <Link href="/connexion" className="text-stone-700 hover:text-amber-600 transition">
+              Connexion
+            </Link>
+            <Link href="/profil" className="text-amber-700 font-semibold hover:text-amber-800 transition">
+              Mon Profil
             </Link>
             <Link
               href="/live"
