@@ -32,11 +32,10 @@ export default function BoutiqueAcheteurPage() {
   };
 
   useEffect(() => {
-    // Vérifier si le client revient d'un paiement Stripe
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       if (params.get("paiement") === "succes") {
-        showNotice("🎉 Paiement validé avec succès ! Merci pour votre commande.", "success");
+        showNotice("Paiement validé avec succès ! Merci pour votre commande.", "success");
         window.history.replaceState({}, "", "/boutique");
       } else if (params.get("paiement") === "annule") {
         showNotice("Le paiement a été annulé. Vos articles sont toujours dans votre panier.", "error");
@@ -97,7 +96,7 @@ export default function BoutiqueAcheteurPage() {
         showNotice("Erreur Stripe : " + (data.error || "Impossible d'ouvrir le paiement."), "error");
         setPaying(false);
       }
-    } catch (err: any) {
+    } catch {
       showNotice("Erreur de connexion au paiement.", "error");
       setPaying(false);
     }
@@ -136,7 +135,7 @@ export default function BoutiqueAcheteurPage() {
               onClick={() => setShowCart(!showCart)}
               className="bg-amber-100 text-amber-900 px-4 py-2 rounded-full font-semibold hover:bg-amber-200 transition"
             >
-              🛒 Panier ({totalItems})
+              Panier ({totalItems})
             </button>
           </nav>
         </div>
@@ -214,7 +213,7 @@ export default function BoutiqueAcheteurPage() {
                     disabled={paying}
                     className="bg-indigo-600 text-white font-semibold px-6 py-3 rounded-xl hover:bg-indigo-700 transition disabled:opacity-50"
                   >
-                    {paying ? "Ouverture de Stripe..." : "🔒 Payer maintenant (Bancontact / Carte)"}
+                    {paying ? "Ouverture de Stripe..." : "Payer maintenant (Bancontact / Carte)"}
                   </button>
                 </div>
               </div>
@@ -258,3 +257,6 @@ export default function BoutiqueAcheteurPage() {
                       {(p.price_cents / 100).toFixed(2)} €
                     </p>
                     <p className="text-xs text-stone-500 mt-1">
+                      Disponible : {p.stock} en stock
+                    </p>
+                  </div>
