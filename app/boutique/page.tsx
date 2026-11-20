@@ -11,6 +11,12 @@ export default function BoutiquePage() {
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("1");
+  const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  const showNotice = (text: string, type: "success" | "error" = "success") => {
+    setMessage({ text, type });
+    setTimeout(() => setMessage(null), 3500);
+  };
 
   const fetchBoutiqueProducts = async () => {
     const { data, error } = await supabase
@@ -31,7 +37,7 @@ export default function BoutiquePage() {
     const numericPrice = parseFloat(price);
 
     if (!title || isNaN(numericPrice) || numericPrice <= 0) {
-      alert("Veuillez entrer un nom valide et un prix supérieur à 0 €.");
+      showNotice("Veuillez entrer un nom valide et un prix supérieur à 0 €.", "error");
       return;
     }
 
@@ -49,6 +55,8 @@ export default function BoutiquePage() {
           .from("products")
           .getPublicUrl(fileName);
         imageUrl = data.publicUrl;
+      } else {
+        showNotice("Photo non envoyée : " + uploadError.message, "error");
       }
     }
 
@@ -62,20 +70,27 @@ export default function BoutiquePage() {
     ]);
 
     if (!error) {
-      alert("Article ajouté à la boutique !");
+      showNotice("Article ajouté à la boutique !");
       setTitle("");
       setPrice("");
       setFile(null);
       setStock("1");
       fetchBoutiqueProducts();
     } else {
-      alert("Erreur : " + error.message);
+      showNotice("Erreur : " + error.message, "error");
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase.from("boutique_products").delete().eq("id", id);
+    if (!error) {
+      showNotice("Article supprimé.");
+      fetchBoutiqueProducts();
     }
   };
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900">
-      {/* En-tête */}
       <header className="bg-white border-b border-stone-200 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="text-xl font-extrabold tracking-tight text-stone-900">
@@ -106,8 +121,19 @@ export default function BoutiquePage() {
           </p>
         </div>
 
+        {message && (
+          <div
+            className={`mb-6 p-4 rounded-xl text-sm font-medium ${
+              message.type === "success"
+                ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                : "bg-red-50 text-red-800 border border-red-200"
+            }`}
+          >
+            {message.text}
+          </div>
+        )}
+
         <div className="grid lg:grid-cols-3 gap-8 items-start">
-          {/* Formulaire d'ajout à la boutique */}
           <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm">
             <h2 className="text-lg font-bold mb-4">Ajouter un article en boutique</h2>
             <form onSubmit={handleAddProduct} className="flex flex-col gap-3">
@@ -116,7 +142,7 @@ export default function BoutiquePage() {
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                  onChange={(e) => setFile(e.target.files ? e.target.files.item(0) : null)}
                   className="text-sm text-stone-600"
                 />
               </div>
@@ -155,7 +181,6 @@ export default function BoutiquePage() {
             </form>
           </div>
 
-          {/* Liste des produits de la boutique */}
           <div className="lg:col-span-2">
             {loading ? (
               <p className="text-stone-500">Chargement du catalogue...</p>
@@ -183,7 +208,16 @@ export default function BoutiquePage() {
                         </div>
                       )}
                       <div className="p-5">
-                        <h3 className="font-bold text-lg text-stone-900">{p.title}</h3>
+                        <div className="flex items-start justify-between gap-2">
+                          <h3 className="font-bold text-lg text-stone-900">{p.title}</h3>
+                          <button
+                            onClick={() => handleDelete(p.id)}
+                            className="text-xs text-stone-400 hover:text-red-600"
+                            title="Supprimer cet article"
+                          >
+                            Supprimer
+                          </button>
+                        </div>
                         <p className="text-amber-600 font-extrabold text-xl mt-1">
                           {(p.price_cents / 100).toFixed(2)} €
                         </p>
@@ -194,7 +228,7 @@ export default function BoutiquePage() {
                     </div>
                     <div className="px-5 pb-5">
                       <button
-                        onClick={() => alert(`Article "${p.title}" ajouté au panier !`)}
+                        onClick={() => showNotice(`"${p.title}" ajouté au panier !`)}
                         className="w-full bg-stone-900 text-white font-medium py-2.5 rounded-xl hover:bg-stone-800 transition text-sm"
                       >
                         Commander cet article
