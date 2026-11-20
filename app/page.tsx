@@ -13,7 +13,10 @@ export default function HomePage() {
           </Link>
           <nav className="flex items-center gap-6 text-sm font-medium">
             <Link href="/boutique" className="text-stone-700 hover:text-amber-600 transition">
-              La Boutique
+              Boutique (Clients)
+            </Link>
+            <Link href="/vendeur" className="text-stone-700 hover:text-amber-600 transition">
+              Espace Vendeur
             </Link>
             <Link
               href="/live"
@@ -36,21 +39,21 @@ export default function HomePage() {
             Découvrez des créations uniques, en boutique ou en direct.
           </h1>
           <p className="text-lg text-stone-600">
-            Explorez le catalogue permanent des créateurs ou rejoignez une session vidéo en direct pour réserver vos coups de cœur instantanément.
+            Choisissez votre espace ci-dessous selon que vous souhaitez acheter des créations ou gérer votre boutique vendeur.
           </p>
         </div>
 
-        {/* Deux cartes bien séparées */}
-        <div className="grid md:grid-cols-2 gap-8">
-          {/* Carte 1 : Boutique */}
+        {/* Trois espaces bien distincts */}
+        <div className="grid md:grid-cols-3 gap-8">
+          {/* Carte 1 : Espace Client (Boutique) */}
           <div className="bg-white p-8 rounded-2xl border border-stone-200 shadow-sm flex flex-col justify-between">
             <div>
               <div className="w-12 h-12 bg-amber-100 text-amber-700 rounded-xl flex items-center justify-center text-2xl mb-6">
                 🛍️
               </div>
-              <h2 className="text-2xl font-bold mb-3">La Boutique Créateurs</h2>
+              <h2 className="text-2xl font-bold mb-3">Espace Client</h2>
               <p className="text-stone-600 mb-6">
-                Parcourez les collections disponibles à tout moment, gérez votre catalogue vendeur et commandez tranquillement hors direct.
+                Parcourez le catalogue de la boutique, ajoutez vos coups de cœur à votre panier et commandez en toute simplicité.
               </p>
             </div>
             <Link
@@ -61,7 +64,26 @@ export default function HomePage() {
             </Link>
           </div>
 
-          {/* Carte 2 : Live */}
+          {/* Carte 2 : Espace Vendeur */}
+          <div className="bg-white p-8 rounded-2xl border border-stone-200 shadow-sm flex flex-col justify-between">
+            <div>
+              <div className="w-12 h-12 bg-stone-100 text-stone-800 rounded-xl flex items-center justify-center text-2xl mb-6">
+                🏪
+              </div>
+              <h2 className="text-2xl font-bold mb-3">Espace Vendeur</h2>
+              <p className="text-stone-600 mb-6">
+                Publiez vos créations avec photos et tarifs, gérez votre stock et supprimez vos articles à tout moment.
+              </p>
+            </div>
+            <Link
+              href="/vendeur"
+              className="w-full text-center bg-stone-800 text-white font-semibold py-3.5 px-6 rounded-xl hover:bg-stone-900 transition"
+            >
+              Gérer ma Boutique
+            </Link>
+          </div>
+
+          {/* Carte 3 : Live */}
           <div className="bg-stone-900 text-white p-8 rounded-2xl shadow-sm flex flex-col justify-between">
             <div>
               <div className="w-12 h-12 bg-stone-800 text-red-400 rounded-xl flex items-center justify-center text-2xl mb-6">
@@ -69,7 +91,7 @@ export default function HomePage() {
               </div>
               <h2 className="text-2xl font-bold mb-3">Les Ventes en Live</h2>
               <p className="text-stone-300 mb-6">
-                Assistez aux présentations en direct des créateurs et réservez les pièces présentées devant la caméra avant épuisement.
+                Assistez aux présentations en direct des créateurs et réservez les pièces présentées devant la caméra.
               </p>
             </div>
             <Link
@@ -82,7 +104,6 @@ export default function HomePage() {
         </div>
       </main>
 
-      {/* Pied de page */}
       <footer className="border-t border-stone-200 py-6 text-center text-sm text-stone-500">
         © {new Date().getFullYear()} CRÉA-LIVE MARKET — Tous droits réservés
       </footer>
