@@ -1,6 +1,8 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "../../lib/supabase";
 
@@ -13,8 +15,13 @@ type Product = {
 };
 
 export default function VendeurPage() {
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [shopName, setShopName] = useState<string>("");
+  const [profileIncomplete, setProfileIncomplete] = useState(false);
+
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
@@ -26,22 +33,65 @@ export default function VendeurPage() {
     setTimeout(() => setMessage(null), 3500);
   };
 
-  const fetchStock = async () => {
+  useEffect(() => {
+    const checkVendeurAccess = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // 1. Non connecté -> redirection vers inscription / connexion
+      if (!user) {
+        router.push("/connexion");
+        return;
+      }
+
+      // 2. Vérifier le rôle et les coordonnées obligatoires
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+
+      if (!profile || profile.role !== "vendeur") {
+        router.push("/connexion");
+        return;
+      }
+
+      setUserId(user.id);
+      setShopName(profile.shop_name || "Ma Boutique");
+
+      // Vérifie que téléphone, date de naissance et adresse sont remplis
+      if (!profile.phone || !profile.birth_date || !profile.address || !profile.postal_code || !profile.city) {
+        setProfileIncomplete(true);
+        setLoading(false);
+        return;
+      }
+
+      // 3. Charger uniquement le stock de ce vendeur
+      const { data, error } = await supabase
+        .from("boutique_products")
+        .select("*")
+        .eq("seller_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (!error && data) setProducts(data);
+      setLoading(false);
+    };
+
+    checkVendeurAccess();
+  }, [router]);
+
+  const refreshStock = async (uid: string) => {
     const { data, error } = await supabase
       .from("boutique_products")
       .select("*")
+      .eq("seller_id", uid)
       .order("created_at", { ascending: false });
 
     if (!error && data) setProducts(data);
-    setLoading(false);
   };
-
-  useEffect(() => {
-    fetchStock();
-  }, []);
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!userId) return;
     const numericPrice = parseFloat(price);
 
     if (!title || isNaN(numericPrice) || numericPrice <= 0) {
@@ -53,7 +103,7 @@ export default function VendeurPage() {
 
     if (file) {
       const fileExt = file.name.split(".").pop();
-      const fileName = `boutique-${Date.now()}.${fileExt}`;
+      const fileName = `boutique-${userId}-${Date.now()}.${fileExt}`;
       const { error: uploadError } = await supabase.storage
         .from("products")
         .upload(fileName, file);
@@ -74,28 +124,44 @@ export default function VendeurPage() {
         price_cents: Math.round(numericPrice * 100),
         image_url: imageUrl,
         stock: Math.max(1, parseInt(stock) || 1),
+        seller_id: userId,
+        shop_name: shopName,
       },
     ]);
 
     if (!error) {
-      showNotice("Article ajouté à votre stock boutique !");
+      showNotice("Article publié dans votre boutique !");
       setTitle("");
       setPrice("");
       setFile(null);
       setStock("1");
-      fetchStock();
+      refreshStock(userId);
     } else {
       showNotice("Erreur : " + error.message, "error");
     }
   };
 
   const handleDelete = async (id: string) => {
-    const { error } = await supabase.from("boutique_products").delete().eq("id", id);
+    if (!userId) return;
+    const { error } = await supabase
+      .from("boutique_products")
+      .delete()
+      .eq("id", id)
+      .eq("seller_id", userId);
+
     if (!error) {
       showNotice("Article retiré de votre stock.");
-      fetchStock();
+      refreshStock(userId);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center text-stone-500">
+        Vérification de votre accès vendeur...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900">
@@ -104,15 +170,15 @@ export default function VendeurPage() {
           <Link href="/" className="text-xl font-extrabold tracking-tight text-stone-900">
             CRÉA-LIVE <span className="text-amber-600">MARKET</span>
           </Link>
-          <nav className="flex items-center gap-6 text-sm font-medium">
+          <nav className="flex items-center gap-5 text-sm font-medium">
             <Link href="/" className="text-stone-600 hover:text-stone-900">
               Accueil
             </Link>
             <Link href="/boutique" className="text-stone-600 hover:text-stone-900">
-              Boutique (Clients)
+              Boutique
             </Link>
-            <Link href="/vendeur" className="text-amber-600 font-bold">
-              Espace Vendeur
+            <Link href="/profil" className="text-stone-600 hover:text-stone-900">
+              Mon Profil
             </Link>
             <Link
               href="/live"
@@ -127,127 +193,92 @@ export default function VendeurPage() {
       <main className="max-w-6xl mx-auto px-6 py-10">
         <div className="mb-8">
           <span className="inline-block bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1 rounded-full mb-2">
-            Gestion de votre stock
+            Boutique : {shopName}
           </span>
           <h1 className="text-3xl font-extrabold text-stone-900">Espace Vendeur</h1>
           <p className="text-stone-600 mt-1">
-            Ajoutez vos créations et gérez les articles visibles dans la boutique.
+            Gérez uniquement votre stock personnel et vos publications.
           </p>
         </div>
 
-        {message && (
-          <div
-            className={`mb-6 p-4 rounded-xl text-sm font-medium ${
-              message.type === "success"
-                ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                : "bg-red-50 text-red-800 border border-red-200"
-            }`}
-          >
-            {message.text}
+        {/* Blocage si fiche coordonnées incomplète */}
+        {profileIncomplete ? (
+          <div className="bg-amber-50 border-2 border-amber-400 p-8 rounded-2xl max-w-xl">
+            <h2 className="text-xl font-bold text-amber-950 mb-2">
+              ⚠️ Fiche légale et coordonnées incomplètes
+            </h2>
+            <p className="text-sm text-amber-900 mb-6">
+              Avant de pouvoir mettre des articles en vente sur CRÉA-LIVE MARKET, vous devez obligatoirement renseigner votre téléphone, votre date de naissance et votre adresse postale complète dans votre fiche profil.
+            </p>
+            <Link
+              href="/profil"
+              className="inline-block bg-amber-600 text-white font-semibold px-6 py-3 rounded-xl hover:bg-amber-700 transition text-sm"
+            >
+              Compléter ma fiche profil maintenant →
+            </Link>
           </div>
-        )}
-
-        <div className="grid lg:grid-cols-3 gap-8 items-start">
-          <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm">
-            <h2 className="text-lg font-bold mb-4">Ajouter un article à ma boutique</h2>
-            <form onSubmit={handleAddProduct} className="flex flex-col gap-3">
-              <div>
-                <label className="block text-xs font-medium text-stone-600 mb-1">Photo</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setFile(e.target.files ? e.target.files.item(0) : null)}
-                  className="text-sm text-stone-600"
-                />
-              </div>
-              <input
-                type="text"
-                placeholder="Nom de la création"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
-                className="p-2.5 border border-stone-300 rounded-lg text-sm"
-              />
-              <input
-                type="number"
-                step="0.01"
-                min="0.50"
-                placeholder="Prix (€)"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                required
-                className="p-2.5 border border-stone-300 rounded-lg text-sm"
-              />
-              <input
-                type="number"
-                min="1"
-                placeholder="Quantité en stock"
-                value={stock}
-                onChange={(e) => setStock(e.target.value)}
-                className="p-2.5 border border-stone-300 rounded-lg text-sm"
-              />
-              <button
-                type="submit"
-                className="mt-2 bg-amber-600 text-white font-semibold py-2.5 rounded-lg hover:bg-amber-700 transition"
+        ) : (
+          <>
+            {message && (
+              <div
+                className={`mb-6 p-4 rounded-xl text-sm font-medium ${
+                  message.type === "success"
+                    ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                    : "bg-red-50 text-red-800 border border-red-200"
+                }`}
               >
-                + Publier dans ma boutique
-              </button>
-            </form>
-          </div>
-
-          <div className="lg:col-span-2">
-            <h2 className="text-lg font-bold mb-4">Mon stock actuel ({products.length})</h2>
-            {loading ? (
-              <p className="text-stone-500">Chargement de votre stock...</p>
-            ) : products.length === 0 ? (
-              <div className="bg-white p-10 rounded-2xl border border-stone-200 text-center text-stone-500">
-                Votre stock est vide. Ajoutez votre premier article à gauche.
-              </div>
-            ) : (
-              <div className="grid sm:grid-cols-2 gap-6">
-                {products.map((p) => (
-                  <div
-                    key={p.id}
-                    className="bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-sm flex flex-col justify-between"
-                  >
-                    <div>
-                      {p.image_url ? (
-                        <img
-                          src={p.image_url}
-                          alt={p.title}
-                          className="w-full h-44 object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-44 bg-stone-100 flex items-center justify-center text-stone-400 text-sm">
-                          Pas de photo
-                        </div>
-                      )}
-                      <div className="p-5">
-                        <h3 className="font-bold text-lg text-stone-900">{p.title}</h3>
-                        <p className="text-amber-600 font-extrabold text-xl mt-1">
-                          {(p.price_cents / 100).toFixed(2)} €
-                        </p>
-                        <p className="text-xs text-stone-500 mt-1">
-                          Quantité en stock : {p.stock}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="px-5 pb-5">
-                      <button
-                        onClick={() => handleDelete(p.id)}
-                        className="w-full bg-red-50 text-red-600 border border-red-200 font-semibold py-2 rounded-xl hover:bg-red-100 transition text-sm"
-                      >
-                        Supprimer de mon stock
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                {message.text}
               </div>
             )}
-          </div>
-        </div>
-      </main>
-    </div>
-  );
-}
 
+            <div className="grid lg:grid-cols-3 gap-8 items-start">
+              <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm">
+                <h2 className="text-lg font-bold mb-4">Ajouter un article à mon stock</h2>
+                <form onSubmit={handleAddProduct} className="flex flex-col gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-stone-600 mb-1">Photo</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setFile(e.target.files ? e.target.files.item(0) : null)}
+                      className="text-sm text-stone-600"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Nom de la création"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    required
+                    className="p-2.5 border border-stone-300 rounded-lg text-sm"
+                  />
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.50"
+                    placeholder="Prix (€)"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    required
+                    className="p-2.5 border border-stone-300 rounded-lg text-sm"
+                  />
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="Quantité en stock"
+                    value={stock}
+                    onChange={(e) => setStock(e.target.value)}
+                    className="p-2.5 border border-stone-300 rounded-lg text-sm"
+                  />
+                  <button
+                    type="submit"
+                    className="mt-2 bg-amber-600 text-white font-semibold py-2.5 rounded-lg hover:bg-amber-700 transition"
+                  >
+                    + Publier dans ma boutique
+                  </button>
+                </form>
+              </div>
+
+              <div className="lg:col-span-2">
+                <h2 className="text-lg font-bold mb-4">Mon stock personnel ({products.length})</h2>
+                {products.length === 0 ? (
