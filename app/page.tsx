@@ -11,98 +11,104 @@ export default function HomePage() {
           <Link href="/" className="text-xl font-extrabold tracking-tight text-stone-900">
             CRÉA-LIVE <span className="text-amber-600">MARKET</span>
           </Link>
-          <nav className="flex items-center gap-5 text-sm font-medium">
+          <nav className="flex items-center gap-4 text-sm font-medium">
             <Link href="/boutique" className="text-stone-700 hover:text-amber-600 transition">
               Boutique
             </Link>
             <Link href="/vendeur" className="text-stone-700 hover:text-amber-600 transition">
               Espace Vendeur
             </Link>
-            <Link href="/connexion" className="text-stone-700 hover:text-amber-600 transition">
-              Connexion
-            </Link>
-            <Link href="/profil" className="text-amber-700 font-semibold hover:text-amber-800 transition">
-              Mon Profil
+            <Link href="/live" className="text-stone-700 hover:text-amber-600 transition">
+              Live
             </Link>
             <Link
-              href="/live"
-              className="bg-stone-900 text-white px-4 py-2 rounded-full hover:bg-stone-800 transition flex items-center gap-2"
+              href="/connexion"
+              className="bg-amber-600 text-white px-4 py-2 rounded-full font-semibold hover:bg-amber-700 transition"
             >
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              Espace Live
+              Inscription / Connexion
+            </Link>
+            <Link
+              href="/profil"
+              className="border border-stone-300 text-stone-800 px-4 py-2 rounded-full font-semibold hover:bg-stone-100 transition"
+            >
+              Mon Profil
             </Link>
           </nav>
         </div>
       </header>
 
-      {/* Section principale (Vitrine) */}
+      {/* Section principale */}
       <main className="flex-1 max-w-6xl mx-auto px-6 py-16 flex flex-col justify-center">
-        <div className="text-center max-w-3xl mx-auto mb-14">
+        <div className="text-center max-w-3xl mx-auto mb-12">
           <span className="inline-block bg-amber-100 text-amber-800 text-xs font-semibold px-3 py-1 rounded-full mb-4">
             Artisanat • Création • Vente en direct
           </span>
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-stone-900 mb-6">
-            Découvrez des créations uniques, en boutique ou en direct.
+            La plateforme des créateurs et de leurs clients.
           </h1>
-          <p className="text-lg text-stone-600">
-            Choisissez votre espace ci-dessous selon que vous souhaitez acheter des créations ou gérer votre boutique vendeur.
+          <p className="text-lg text-stone-600 mb-8">
+            Inscrivez-vous en tant que <strong>Vendeur</strong> pour ouvrir votre boutique et lancer vos lives, ou en tant que <strong>Client</strong> pour commander.
           </p>
+
+          {/* Deux gros boutons d'inscription immédiats */}
+          <div className="flex flex-wrap justify-center gap-4">
+            <Link
+              href="/connexion"
+              className="bg-stone-900 text-white font-bold py-4 px-8 rounded-2xl hover:bg-stone-800 transition shadow-sm"
+            >
+              🏪 Ouvrir un compte Vendeur
+            </Link>
+            <Link
+              href="/connexion"
+              className="bg-amber-600 text-white font-bold py-4 px-8 rounded-2xl hover:bg-amber-700 transition shadow-sm"
+            >
+              🛍️ Créer un compte Client
+            </Link>
+          </div>
         </div>
 
         {/* Trois espaces bien distincts */}
         <div className="grid md:grid-cols-3 gap-8">
-          {/* Carte 1 : Espace Client (Boutique) */}
           <div className="bg-white p-8 rounded-2xl border border-stone-200 shadow-sm flex flex-col justify-between">
             <div>
-              <div className="w-12 h-12 bg-amber-100 text-amber-700 rounded-xl flex items-center justify-center text-2xl mb-6">
-                🛍️
-              </div>
-              <h2 className="text-2xl font-bold mb-3">Espace Client</h2>
-              <p className="text-stone-600 mb-6">
-                Parcourez le catalogue de la boutique, ajoutez vos coups de cœur à votre panier et commandez en toute simplicité.
+              <h2 className="text-xl font-bold mb-2">1. La Boutique</h2>
+              <p className="text-stone-600 text-sm mb-6">
+                Explorez les créations disponibles et ajoutez-les à votre panier.
               </p>
             </div>
             <Link
               href="/boutique"
-              className="w-full text-center bg-amber-600 text-white font-semibold py-3.5 px-6 rounded-xl hover:bg-amber-700 transition"
+              className="w-full text-center bg-stone-100 text-stone-900 font-semibold py-3 rounded-xl hover:bg-stone-200 transition text-sm"
             >
-              Accéder à la Boutique
+              Voir la Boutique
             </Link>
           </div>
 
-          {/* Carte 2 : Espace Vendeur */}
           <div className="bg-white p-8 rounded-2xl border border-stone-200 shadow-sm flex flex-col justify-between">
             <div>
-              <div className="w-12 h-12 bg-stone-100 text-stone-800 rounded-xl flex items-center justify-center text-2xl mb-6">
-                🏪
-              </div>
-              <h2 className="text-2xl font-bold mb-3">Espace Vendeur</h2>
-              <p className="text-stone-600 mb-6">
-                Publiez vos créations avec photos et tarifs, gérez votre stock et supprimez vos articles à tout moment.
+              <h2 className="text-xl font-bold mb-2">2. Espace Vendeur</h2>
+              <p className="text-stone-600 text-sm mb-6">
+                Réservé aux vendeurs inscrits : gérez vos coordonnées, votre stock et vos ventes.
               </p>
             </div>
             <Link
               href="/vendeur"
-              className="w-full text-center bg-stone-800 text-white font-semibold py-3.5 px-6 rounded-xl hover:bg-stone-900 transition"
+              className="w-full text-center bg-stone-100 text-stone-900 font-semibold py-3 rounded-xl hover:bg-stone-200 transition text-sm"
             >
-              Gérer ma Boutique
+              Accéder à mon Espace Vendeur
             </Link>
           </div>
 
-          {/* Carte 3 : Live */}
           <div className="bg-stone-900 text-white p-8 rounded-2xl shadow-sm flex flex-col justify-between">
             <div>
-              <div className="w-12 h-12 bg-stone-800 text-red-400 rounded-xl flex items-center justify-center text-2xl mb-6">
-                🎥
-              </div>
-              <h2 className="text-2xl font-bold mb-3">Les Ventes en Live</h2>
-              <p className="text-stone-300 mb-6">
-                Assistez aux présentations en direct des créateurs et réservez les pièces présentées devant la caméra.
+              <h2 className="text-xl font-bold mb-2">3. Les Ventes en Live</h2>
+              <p className="text-stone-300 text-sm mb-6">
+                Regardez les créateurs en direct et réservez leurs pièces avant épuisement.
               </p>
             </div>
             <Link
               href="/live"
-              className="w-full text-center bg-white text-stone-900 font-semibold py-3.5 px-6 rounded-xl hover:bg-stone-100 transition"
+              className="w-full text-center bg-white text-stone-900 font-semibold py-3 rounded-xl hover:bg-stone-100 transition text-sm"
             >
               Rejoindre l&apos;Espace Live
             </Link>
