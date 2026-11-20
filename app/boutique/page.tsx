@@ -10,6 +10,7 @@ type Product = {
   price_cents: number;
   image_url: string;
   stock: number;
+  shop_name?: string;
 };
 
 type CartItem = {
@@ -20,16 +21,29 @@ type CartItem = {
 export default function BoutiqueAcheteurPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [paying, setPaying] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
-  const showNotice = (text: string) => {
-    setMessage(text);
-    setTimeout(() => setMessage(null), 3500);
+  const showNotice = (text: string, type: "success" | "error" = "success") => {
+    setMessage({ text, type });
+    setTimeout(() => setMessage(null), 5000);
   };
 
   useEffect(() => {
+    // Vérifier si le client revient d'un paiement Stripe
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("paiement") === "succes") {
+        showNotice("🎉 Paiement validé avec succès ! Merci pour votre commande.", "success");
+        window.history.replaceState({}, "", "/boutique");
+      } else if (params.get("paiement") === "annule") {
+        showNotice("Le paiement a été annulé. Vos articles sont toujours dans votre panier.", "error");
+        window.history.replaceState({}, "", "/boutique");
+      }
+    }
+
     const fetchProducts = async () => {
       const { data, error } = await supabase
         .from("boutique_products")
@@ -47,7 +61,7 @@ export default function BoutiqueAcheteurPage() {
       const existing = prev.find((item) => item.product.id === product.id);
       if (existing) {
         if (existing.quantity >= product.stock) {
-          showNotice("Stock maximum atteint pour cet article.");
+          showNotice("Stock maximum atteint pour cet article.", "error");
           return prev;
         }
         return prev.map((item) =>
@@ -64,6 +78,29 @@ export default function BoutiqueAcheteurPage() {
   const removeFromCart = (productId: string) => {
     setCart((prev) => prev.filter((item) => item.product.id !== productId));
     showNotice("Article retiré du panier.");
+  };
+
+  const handleCheckout = async () => {
+    setPaying(true);
+    try {
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: cart }),
+      });
+
+      const data = await response.json();
+
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        showNotice("Erreur Stripe : " + (data.error || "Impossible d'ouvrir le paiement."), "error");
+        setPaying(false);
+      }
+    } catch (err: any) {
+      showNotice("Erreur de connexion au paiement.", "error");
+      setPaying(false);
+    }
   };
 
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -109,13 +146,19 @@ export default function BoutiqueAcheteurPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-extrabold text-stone-900">La Boutique</h1>
           <p className="text-stone-600 mt-1">
-            Découvrez les créations disponibles et ajoutez vos coups de cœur au panier.
+            Découvrez les créations disponibles et payez en toute sécurité par Bancontact ou Carte bancaire.
           </p>
         </div>
 
         {message && (
-          <div className="mb-6 p-4 rounded-xl text-sm font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
-            {message}
+          <div
+            className={`mb-6 p-4 rounded-xl text-sm font-medium ${
+              message.type === "success"
+                ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                : "bg-red-50 text-red-800 border border-red-200"
+            }`}
+          >
+            {message.text}
           </div>
         )}
 
@@ -162,19 +205,16 @@ export default function BoutiqueAcheteurPage() {
                   ))}
                 </div>
 
-                <div className="mt-4 pt-4 border-t border-stone-200 flex items-center justify-between">
+                <div className="mt-4 pt-4 border-t border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <span className="text-lg font-extrabold">
                     Total : {(totalPriceCents / 100).toFixed(2)} €
                   </span>
                   <button
-                    onClick={() => {
-                      showNotice("Commande validée ! Merci pour votre achat.");
-                      setCart([]);
-                      setShowCart(false);
-                    }}
-                    className="bg-amber-600 text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-amber-700 transition"
+                    onClick={handleCheckout}
+                    disabled={paying}
+                    className="bg-indigo-600 text-white font-semibold px-6 py-3 rounded-xl hover:bg-indigo-700 transition disabled:opacity-50"
                   >
-                    Commander
+                    {paying ? "Ouverture de Stripe..." : "🔒 Payer maintenant (Bancontact / Carte)"}
                   </button>
                 </div>
               </div>
@@ -208,28 +248,13 @@ export default function BoutiqueAcheteurPage() {
                     </div>
                   )}
                   <div className="p-5">
+                    {p.shop_name && (
+                      <span className="text-xs font-semibold text-stone-400 uppercase tracking-wide">
+                        {p.shop_name}
+                      </span>
+                    )}
                     <h3 className="font-bold text-lg text-stone-900">{p.title}</h3>
                     <p className="text-amber-600 font-extrabold text-xl mt-1">
                       {(p.price_cents / 100).toFixed(2)} €
                     </p>
                     <p className="text-xs text-stone-500 mt-1">
-                      Disponible : {p.stock} en stock
-                    </p>
-                  </div>
-                </div>
-                <div className="px-5 pb-5">
-                  <button
-                    onClick={() => addToCart(p)}
-                    className="w-full bg-stone-900 text-white font-medium py-2.5 rounded-xl hover:bg-stone-800 transition text-sm"
-                  >
-                    Ajouter au panier
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </main>
-    </div>
-  );
-}
