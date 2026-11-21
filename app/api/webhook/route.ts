@@ -86,7 +86,29 @@ export async function POST(req: Request) {
     if (orderError || !order) {
       console.error("order insert error", orderError);
       return NextResponse.json({ error: "Commande non enregistrée." }, { status: 500 });
+            null;
+      const quantity = line.quantity ?? 1;
+
+      await supabase.from("order_items").insert({
+        order_id: order.id,
+        product_id: productId,
+        seller_id: productId ? sellerOf.get(productId) ?? null : null,
+        title: line.description ?? "Article",
+        unit_price_cents: line.price?.unit_amount ?? 0,
+        quantity,
+      });
+
+      if (productId) {
+        await supabase.rpc("take_stock", { p_id: productId, p_qty: quantity });
+      }
     }
+
+    return NextResponse.json({ received: true });
+  } catch (err) {
+    console.error("webhook error", err);
+    return NextResponse.json({ error: "Erreur de traitement." }, { status: 500 });
+  }
+}
 
     for (const line of lines) {
       const productId =
