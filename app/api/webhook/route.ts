@@ -91,3 +91,4 @@ export async function POST(req: Request) {
     for (const line of lines) {
       const productId =
         (line.price?.product as Stripe.Product | undefined)?.metadata?.product_id ||
+        }
