@@ -86,7 +86,11 @@ export async function POST(req: Request) {
     if (orderError || !order) {
       console.error("order insert error", orderError);
       return NextResponse.json({ error: "Commande non enregistrée." }, { status: 500 });
-            null;
+    }
+
+    for (const line of lines) {
+      const productId =
+        (line.price?.product as Stripe.Product | undefined)?.metadata?.product_id || null;
       const quantity = line.quantity ?? 1;
 
       await supabase.from("order_items").insert({
@@ -109,8 +113,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Erreur de traitement." }, { status: 500 });
   }
 }
-
-    for (const line of lines) {
-      const productId =
-        (line.price?.product as Stripe.Product | undefined)?.metadata?.product_id ||
-        }
