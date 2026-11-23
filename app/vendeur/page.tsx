@@ -386,7 +386,13 @@ export default function VendeurPage() {
 
   const paidSales = sales.filter((s) => s.order && s.order.status === "paid");
   const revenueCents = paidSales.reduce((sum, s) => sum + s.unit_price_cents * s.quantity, 0);
-  const totalStock = products.reduce((sum, p) => sum + p.stock, 0);
+  const soldOut = products.filter((p) => p.stock === 0).length;
+  const stockInfo = (n: number) =>
+    n === 0
+      ? { label: "Épuisé", cls: "bg-red-50 text-red-700" }
+      : n <= 2
+      ? { label: `${n} en stock · faible`, cls: "bg-amber-50 text-amber-800" }
+      : { label: `${n} en stock`, cls: "bg-emerald-50 text-emerald-800" };
   const slots = Array.from({ length: MAX_FREE }, (_, i) => products[i] || null);
 
   if (loading) {
@@ -515,8 +521,8 @@ export default function VendeurPage() {
                     <p className="text-2xl font-extrabold">{MAX_FREE - products.length}</p>
                   </div>
                   <div className="bg-white p-5 rounded-2xl border border-stone-200">
-                    <p className="text-xs text-stone-500">Pièces en stock</p>
-                    <p className="text-2xl font-extrabold">{totalStock}</p>
+                    <p className="text-xs text-stone-500">Articles épuisés</p>
+                    <p className={`text-2xl font-extrabold ${soldOut > 0 ? "text-red-600" : ""}`}>{soldOut}</p>
                   </div>
                   <div className="bg-white p-5 rounded-2xl border border-stone-200">
                     <p className="text-xs text-stone-500">Articles vendus</p>
@@ -526,6 +532,30 @@ export default function VendeurPage() {
                     <p className="text-xs text-stone-500">Ventes (hors frais)</p>
                     <p className="text-2xl font-extrabold">{euro(revenueCents)}</p>
                   </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-lg font-bold">Stock par article</h2>
+                    <button type="button" onClick={() => setTab("stock")} className="text-sm font-semibold text-amber-700 hover:text-amber-800">
+                      Ajuster le stock →
+                    </button>
+                  </div>
+                  {products.length === 0 ? (
+                    <p className="text-sm text-stone-500">Aucun article pour le moment.</p>
+                  ) : (
+                    products.map((p, i) => (
+                      <div key={p.id} className="flex items-center justify-between gap-4 py-3 border-t border-stone-100 text-sm">
+                        <span>
+                          <span className="text-stone-400">Article {i + 1} · </span>
+                          <span className="font-semibold">{p.title}</span>
+                        </span>
+                        <span className={`text-xs font-semibold px-3 py-1 rounded-full whitespace-nowrap ${stockInfo(p.stock).cls}`}>
+                          {stockInfo(p.stock).label}
+                        </span>
+                      </div>
+                    ))
+                  )}
                 </div>
 
                 <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm">
@@ -590,7 +620,9 @@ export default function VendeurPage() {
                               <p className="text-[11px] text-stone-400 mb-1">Emplacement {i + 1}</p>
                               <h3 className="font-bold text-sm text-stone-900 break-words">{p.title}</h3>
                               <p className="text-amber-600 font-extrabold text-sm">{euro(p.price_cents)}</p>
-                              <p className="text-xs text-stone-500">En stock : {p.stock}</p>
+                              <span className={`inline-block mt-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${stockInfo(p.stock).cls}`}>
+                                {stockInfo(p.stock).label}
+                              </span>
                               <div className="mt-auto pt-3 flex gap-2">
                                 <button type="button" onClick={() => startEdit(p)} className="text-xs bg-stone-100 text-stone-700 px-2.5 py-1.5 rounded-lg font-medium hover:bg-stone-200">
                                   Modifier
@@ -657,16 +689,8 @@ export default function VendeurPage() {
                             </div>
                           </td>
                           <td className="p-4">
-                            <span
-                              className={`text-xs font-semibold px-3 py-1 rounded-full ${
-                                p.stock === 0
-                                  ? "bg-red-50 text-red-700"
-                                  : p.stock <= 2
-                                  ? "bg-amber-50 text-amber-800"
-                                  : "bg-emerald-50 text-emerald-800"
-                              }`}
-                            >
-                              {p.stock === 0 ? "Épuisé" : p.stock <= 2 ? "Stock faible" : "En stock"}
+                            <span className={`text-xs font-semibold px-3 py-1 rounded-full ${stockInfo(p.stock).cls}`}>
+                              {p.stock === 0 ? "Épuisé" : p.stock <= 2 ? "Stock faible" : "Disponible"}
                             </span>
                           </td>
                         </tr>
