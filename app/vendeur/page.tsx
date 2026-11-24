@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "../../lib/supabase";
@@ -11,6 +11,30 @@ type Product = {
   price_cents: number;
   image_url: string | null;
   stock: number;
+  description: string | null;
+  category: string | null;
+};
+
+type Variant = {
+  id: string;
+  product_id: string;
+  label: string;
+  stock: number;
+  position: number;
+};
+
+type FormVariant = { id: string | null; label: string; stock: string };
+
+const CATEGORIES = [
+  { value: "femme", label: "Femme" },
+  { value: "homme", label: "Homme" },
+  { value: "enfant", label: "Enfant" },
+  { value: "autre", label: "Autre" },
+];
+
+const categoryLabel = (c: string | null) => {
+  const found = CATEGORIES.find((x) => x.value === c);
+  return found ? found.label : "Sans catégorie";
 };
 
 type OrderInfo = {
@@ -37,7 +61,7 @@ type SaleLine = {
   order: OrderInfo | null;
 };
 
-type Tab = "accueil" | "emplacements" | "stock" | "commandes" | "compte";
+type Tab = "accueil" | "articles" | "stock" | "commandes" | "compte";
 
 const MAX_FREE = 15;
 
@@ -131,20 +155,21 @@ export default function VendeurPage() {
   const [profileIncomplete, setProfileIncomplete] = useState(false);
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [variants, setVariants] = useState<Variant[]>([]);
   const [sales, setSales] = useState<SaleLine[]>([]);
 
-  const [showAdd, setShowAdd] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetId, setSheetId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
+  const [fTitle, setFTitle] = useState("");
+  const [fDesc, setFDesc] = useState("");
+  const [fCategory, setFCategory] = useState("");
+  const [fPrice, setFPrice] = useState("");
+  const [fStock, setFStock] = useState("1");
+  const [fFile, setFFile] = useState<File | null>(null);
+  const [fImage, setFImage] = useState<string | null>(null);
+  const [fVariants, setFVariants] = useState<FormVariant[]>([]);
   const [fileKey, setFileKey] = useState(0);
-  const [title, setTitle] = useState("");
-  const [price, setPrice] = useState("");
-  const [stock, setStock] = useState("1");
-
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editPrice, setEditPrice] = useState("");
-  const [editStock, setEditStock] = useState("");
 
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
@@ -156,10 +181,22 @@ export default function VendeurPage() {
   const loadProducts = useCallback(async (uid: string) => {
     const { data, error } = await supabase
       .from("boutique_products")
-      .select("id,title,price_cents,image_url,stock")
+      .select("id,title,price_cents,image_url,stock,description,category")
       .eq("seller_id", uid)
       .order("created_at", { ascending: true });
-    if (!error && data) setProducts(data as Product[]);
+    if (error || !data) return;
+    setProducts(data as Product[]);
+    const ids = (data as Product[]).map((p) => p.id);
+    if (ids.length === 0) {
+      setVariants([]);
+      return;
+    }
+    const { data: vdata } = await supabase
+      .from("product_variants")
+      .select("id,product_id,label,stock,position")
+      .in("product_id", ids)
+      .order("position", { ascending: true });
+    setVariants((vdata || []) as Variant[]);
   }, []);
 
   const loadSales = useCallback(async (uid: string) => {
@@ -210,26 +247,93 @@ export default function VendeurPage() {
     router.push("/connexion");
   };
 
-  const handleAddProduct = async (e: React.FormEvent) => {
+  const variantsOf = (productId: string) => variants.filter((v) => v.product_id === productId);
+
+  const openNew = () => {
+    setSheetId(null);
+    setFTitle("");
+    setFDesc("");
+    setFCategory("");
+    setFPrice("");
+    setFStock("1");
+    setFFile(null);
+    setFImage(null);
+    setFVariants([]);
+    setFileKey((k) => k + 1);
+    setSheetOpen(true);
+  };
+
+  const openEdit = (p: Product) => {
+    setSheetId(p.id);
+    setFTitle(p.title);
+    setFDesc(p.description || "");
+    setFCategory(p.category || "");
+    setFPrice((p.price_cents / 100).toFixed(2));
+    setFStock(String(p.stock));
+    setFFile(null);
+    setFImage(p.image_url);
+    setFVariants(variantsOf(p.id).map((v) => ({ id: v.id, label: v.label, stock: String(v.stock) })));
+    setFileKey((k) => k + 1);
+    setSheetOpen(true);
+  };
+
+  const addVariantRow = () => setFVariants((list) => [...list, { id: null, label: "", stock: "0" }]);
+
+  const addStandardSizes = () =>
+    setFVariants((list) => {
+      const have = list.map((v) => v.label.trim().toLowerCase());
+      const extra = ["S", "M", "L"]
+        .filter((s) => !have.includes(s.toLowerCase()))
+        .map((s) => ({ id: null, label: s, stock: "0" }));
+      return [...list, ...extra];
+    });
+
+  const updateVariantRow = (index: number, patch: Partial<FormVariant>) =>
+    setFVariants((list) => list.map((v, i) => (i === index ? { ...v, ...patch } : v)));
+
+  const removeVariantRow = (index: number) => setFVariants((list) => list.filter((_, i) => i !== index));
+
+  const saveSheet = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId) return;
-    const numericPrice = parseFloat(price.replace(",", "."));
-    if (!title.trim() || isNaN(numericPrice) || numericPrice < 0.5) {
-      showNotice("Entrez un nom et un prix d’au moins 0,50 €.", "error");
+
+    const numericPrice = parseFloat(fPrice.replace(",", "."));
+    if (!fTitle.trim() || isNaN(numericPrice) || numericPrice < 0.5) {
+      showNotice("Entrez un titre et un prix d’au moins 0,50 €.", "error");
       return;
     }
+    if (!fCategory) {
+      showNotice("Choisissez une catégorie (femme, homme, enfant ou autre).", "error");
+      return;
+    }
+    const cleaned = fVariants.map((v) => ({ id: v.id, label: v.label.trim(), stock: parseInt(v.stock) }));
+    if (cleaned.some((v) => !v.label || isNaN(v.stock) || v.stock < 0)) {
+      showNotice("Chaque variante doit avoir un nom (par exemple S) et un stock (0 ou plus).", "error");
+      return;
+    }
+    const lowered = cleaned.map((v) => v.label.toLowerCase());
+    if (new Set(lowered).size !== lowered.length) {
+      showNotice("Deux variantes portent le même nom.", "error");
+      return;
+    }
+    const plainStock = parseInt(fStock);
+    if (cleaned.length === 0 && (isNaN(plainStock) || plainStock < 0)) {
+      showNotice("Indiquez le stock de l’article (0 ou plus).", "error");
+      return;
+    }
+
     setSaving(true);
 
-    let imageUrl = "";
-    if (file) {
-      const ext = (file.name.split(".").pop() || "").toLowerCase();
+    let imageUrl = fImage || "";
+    if (fFile) {
+      const ext = (fFile.name.split(".").pop() || "").toLowerCase();
       if (!["jpg", "jpeg", "png", "webp", "gif"].includes(ext)) {
         showNotice("La photo doit être au format JPG, PNG, WEBP ou GIF.", "error");
         setSaving(false);
         return;
       }
       const fileName = `boutique-${userId}-${Date.now()}.${ext}`;
-      const { error: uploadError } = await supabase.storage.from("products").upload(fileName, file);
+      const { error: uploadError } = await supabase.storage.from("products").upload(fileName, fFile);
       if (uploadError) {
         showNotice("Photo non envoyée : " + uploadError.message, "error");
         setSaving(false);
@@ -238,66 +342,103 @@ export default function VendeurPage() {
       imageUrl = supabase.storage.from("products").getPublicUrl(fileName).data.publicUrl;
     }
 
-    const { error } = await supabase.from("boutique_products").insert([
-      {
-        title: title.trim(),
-        price_cents: Math.round(numericPrice * 100),
-        image_url: imageUrl,
-        stock: Math.max(0, parseInt(stock) || 1),
-        seller_id: userId,
-        shop_name: shopName,
-      },
-    ]);
+    const baseFields = {
+      title: fTitle.trim(),
+      description: fDesc.trim() || null,
+      category: fCategory,
+      price_cents: Math.round(numericPrice * 100),
+      image_url: imageUrl,
+    };
+
+    let productId = sheetId;
+    if (!productId) {
+      const { data, error } = await supabase
+        .from("boutique_products")
+        .insert([
+          {
+            ...baseFields,
+            stock: cleaned.length > 0 ? cleaned.reduce((sum, v) => sum + v.stock, 0) : plainStock,
+            seller_id: userId,
+            shop_name: shopName,
+          },
+        ])
+        .select("id")
+        .single();
+      if (error || !data) {
+        showNotice(error ? error.message : "Création impossible.", "error");
+        setSaving(false);
+        return;
+      }
+      productId = data.id as string;
+    } else {
+      const { error } = await supabase
+        .from("boutique_products")
+        .update(baseFields)
+        .eq("id", productId)
+        .eq("seller_id", userId);
+      if (error) {
+        showNotice(error.message, "error");
+        setSaving(false);
+        return;
+      }
+    }
+
+    let problem = "";
+    const keptIds = cleaned.filter((v) => v.id).map((v) => v.id as string);
+    for (const old of variantsOf(productId)) {
+      if (!keptIds.includes(old.id)) {
+        const { error } = await supabase.from("product_variants").delete().eq("id", old.id);
+        if (error && !problem) problem = error.message;
+      }
+    }
+    for (let i = 0; i < cleaned.length; i++) {
+      const v = cleaned[i];
+      if (v.id) {
+        const { error } = await supabase
+          .from("product_variants")
+          .update({ label: v.label, stock: v.stock, position: i })
+          .eq("id", v.id);
+        if (error && !problem) problem = error.message;
+      } else {
+        const { error } = await supabase
+          .from("product_variants")
+          .insert([{ product_id: productId, label: v.label, stock: v.stock, position: i }]);
+        if (error && !problem) problem = error.message;
+      }
+    }
+    if (cleaned.length === 0) {
+      const { error } = await supabase
+        .from("boutique_products")
+        .update({ stock: plainStock })
+        .eq("id", productId)
+        .eq("seller_id", userId);
+      if (error && !problem) problem = error.message;
+    }
+
     setSaving(false);
-
-    if (error) {
-      showNotice(error.message, "error");
+    await loadProducts(userId);
+    if (problem) {
+      showNotice("Article enregistré, mais : " + problem, "error");
       return;
     }
-    showNotice("Article publié dans votre boutique.");
-    setTitle("");
-    setPrice("");
-    setStock("1");
-    setFile(null);
-    setFileKey((k) => k + 1);
-    setShowAdd(false);
-    loadProducts(userId);
+    showNotice(sheetId ? "Article mis à jour." : "Article publié dans votre boutique.");
+    setSheetOpen(false);
   };
 
-  const startEdit = (p: Product) => {
-    setEditingId(p.id);
-    setEditTitle(p.title);
-    setEditPrice((p.price_cents / 100).toFixed(2));
-    setEditStock(String(p.stock));
-  };
-
-  const saveEdit = async (id: string) => {
+  const deleteProduct = async (id: string) => {
     if (!userId) return;
-    const numericPrice = parseFloat(editPrice.replace(",", "."));
-    const numericStock = parseInt(editStock);
-    if (!editTitle.trim() || isNaN(numericPrice) || numericPrice < 0.5 || isNaN(numericStock) || numericStock < 0) {
-      showNotice("Vérifiez le nom, le prix (0,50 € minimum) et le stock.", "error");
-      return;
-    }
-    const { error } = await supabase
-      .from("boutique_products")
-      .update({
-        title: editTitle.trim(),
-        price_cents: Math.round(numericPrice * 100),
-        stock: numericStock,
-      })
-      .eq("id", id)
-      .eq("seller_id", userId);
+    if (!window.confirm("Retirer cet article de votre boutique, avec toutes ses variantes ?")) return;
+    const { error } = await supabase.from("boutique_products").delete().eq("id", id).eq("seller_id", userId);
     if (error) {
       showNotice(error.message, "error");
       return;
     }
-    setEditingId(null);
-    showNotice("Article mis à jour.");
+    showNotice("Article retiré.");
+    setSheetOpen(false);
     loadProducts(userId);
   };
 
-  const adjustStock = async (p: Product, delta: number) => {
+  const adjustProductStock = async (p: Product, delta: number) => {
     if (!userId) return;
     const next = Math.max(0, p.stock + delta);
     if (next === p.stock) return;
@@ -313,22 +454,28 @@ export default function VendeurPage() {
     loadProducts(userId);
   };
 
-  const handleDelete = async (id: string) => {
+  const adjustVariantStock = async (v: Variant, delta: number) => {
     if (!userId) return;
-    if (!window.confirm("Retirer cet article de votre boutique ?")) return;
-    const { error } = await supabase.from("boutique_products").delete().eq("id", id).eq("seller_id", userId);
+    const next = Math.max(0, v.stock + delta);
+    if (next === v.stock) return;
+    const { error } = await supabase.from("product_variants").update({ stock: next }).eq("id", v.id);
     if (error) {
       showNotice(error.message, "error");
       return;
     }
-    showNotice("Article retiré.");
     loadProducts(userId);
   };
 
   const exportProducts = () => {
     downloadCsv("mes-articles.csv", [
-      ["titre", "prix", "stock"],
-      ...products.map((p) => [p.title, (p.price_cents / 100).toFixed(2).replace(".", ","), p.stock]),
+      ["titre", "prix", "stock", "categorie", "description"],
+      ...products.map((p) => [
+        p.title,
+        (p.price_cents / 100).toFixed(2).replace(".", ","),
+        p.stock,
+        p.category || "",
+        p.description || "",
+      ]),
     ]);
   };
 
@@ -342,6 +489,8 @@ export default function VendeurPage() {
       const rowTitle = (r[0] || "").trim();
       const rowPrice = parseFloat((r[1] || "").replace(",", "."));
       const rowStock = parseInt(r[2] || "1", 10);
+      const rowCategory = (r[3] || "").trim().toLowerCase();
+      const rowDesc = (r[4] || "").trim();
       if (i === 0 && isNaN(rowPrice)) continue;
       if (!rowTitle || isNaN(rowPrice) || rowPrice < 0.5) continue;
       const { error } = await supabase.from("boutique_products").insert([
@@ -350,6 +499,8 @@ export default function VendeurPage() {
           price_cents: Math.round(rowPrice * 100),
           image_url: "",
           stock: isNaN(rowStock) ? 1 : Math.max(0, rowStock),
+          category: CATEGORIES.some((c) => c.value === rowCategory) ? rowCategory : "autre",
+          description: rowDesc || null,
           seller_id: userId,
           shop_name: shopName,
         },
@@ -393,7 +544,10 @@ export default function VendeurPage() {
       : n <= 2
       ? { label: `${n} en stock · faible`, cls: "bg-amber-50 text-amber-800" }
       : { label: `${n} en stock`, cls: "bg-emerald-50 text-emerald-800" };
-  const slots = Array.from({ length: MAX_FREE }, (_, i) => products[i] || null);
+  const variantSummary = (productId: string) =>
+    variantsOf(productId)
+      .map((v) => `${v.label} : ${v.stock}`)
+      .join(" · ");
 
   if (loading) {
     return (
@@ -405,13 +559,15 @@ export default function VendeurPage() {
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "accueil", label: "Tableau de bord" },
-    { id: "emplacements", label: `Mes ${MAX_FREE} articles` },
+    { id: "articles", label: `Mes articles (${products.length}/${MAX_FREE})` },
     { id: "stock", label: "Stock" },
     { id: "commandes", label: `Commandes (${paidSales.length})` },
     { id: "compte", label: "Mon compte" },
   ];
 
-  const inputClass = "p-2.5 border border-stone-300 rounded-lg text-sm w-full";
+  const inputClass = "p-2.5 border border-stone-300 rounded-lg text-sm w-full bg-white";
+  const labelClass = "block text-xs font-medium text-stone-600 mb-1";
+  const cardClass = "bg-white p-6 rounded-2xl border border-stone-200 shadow-sm";
 
   const detailRow = (label: string, value: string | null | undefined) => (
     <div className="flex justify-between gap-4 py-3 border-b border-stone-100 last:border-0 text-sm">
@@ -419,6 +575,15 @@ export default function VendeurPage() {
       <span className="font-medium text-stone-900 text-right">{value ? value : "Non renseigné"}</span>
     </div>
   );
+
+  const thumb = (p: Product, size: string) =>
+    p.image_url ? (
+      <img src={p.image_url} alt={p.title} className={`${size} object-cover rounded-lg border border-stone-200`} />
+    ) : (
+      <div className={`${size} rounded-lg bg-stone-100 border border-stone-200 flex items-center justify-center text-[10px] text-stone-400`}>
+        Photo
+      </div>
+    );
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900">
@@ -469,7 +634,7 @@ export default function VendeurPage() {
                 <button
                   key={t.id}
                   type="button"
-                  onClick={() => setTab(t.id)}
+                  onClick={() => { setTab(t.id); setSheetOpen(false); }}
                   className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition ${
                     tab === t.id ? "bg-stone-900 text-white" : "bg-white border border-stone-200 text-stone-600 hover:bg-stone-100"
                   }`}
@@ -494,20 +659,17 @@ export default function VendeurPage() {
 
             {tab === "accueil" && (
               <div className="flex flex-col gap-6">
-                <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm">
+                <div className={cardClass}>
                   <h2 className="text-lg font-bold">Bienvenue, {shopName}</h2>
                   <p className="text-sm text-stone-600 mt-1">
                     Vous utilisez {products.length} emplacement{products.length > 1 ? "s" : ""} sur {MAX_FREE} gratuits.
                   </p>
                   <div className="h-2 bg-stone-100 rounded-full mt-4 overflow-hidden">
-                    <div
-                      className="h-full bg-amber-500"
-                      style={{ width: `${Math.min(100, (products.length / MAX_FREE) * 100)}%` }}
-                    />
+                    <div className="h-full bg-amber-500" style={{ width: `${Math.min(100, (products.length / MAX_FREE) * 100)}%` }} />
                   </div>
                   <button
                     type="button"
-                    onClick={() => { setTab("emplacements"); setShowAdd(true); }}
+                    onClick={() => { setTab("articles"); openNew(); }}
                     disabled={products.length >= MAX_FREE}
                     className="mt-5 bg-amber-600 text-white text-sm font-semibold px-5 py-2.5 rounded-lg hover:bg-amber-700 transition disabled:opacity-50"
                   >
@@ -534,7 +696,7 @@ export default function VendeurPage() {
                   </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm">
+                <div className={cardClass}>
                   <div className="flex items-center justify-between mb-3">
                     <h2 className="text-lg font-bold">Stock par article</h2>
                     <button type="button" onClick={() => setTab("stock")} className="text-sm font-semibold text-amber-700 hover:text-amber-800">
@@ -549,6 +711,9 @@ export default function VendeurPage() {
                         <span>
                           <span className="text-stone-400">Article {i + 1} · </span>
                           <span className="font-semibold">{p.title}</span>
+                          {variantsOf(p.id).length > 0 && (
+                            <span className="block text-xs text-stone-500 mt-0.5">{variantSummary(p.id)}</span>
+                          )}
                         </span>
                         <span className={`text-xs font-semibold px-3 py-1 rounded-full whitespace-nowrap ${stockInfo(p.stock).cls}`}>
                           {stockInfo(p.stock).label}
@@ -558,7 +723,7 @@ export default function VendeurPage() {
                   )}
                 </div>
 
-                <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm">
+                <div className={cardClass}>
                   <div className="flex items-center justify-between mb-3">
                     <h2 className="text-lg font-bold">Dernières commandes</h2>
                     <button type="button" onClick={() => setTab("commandes")} className="text-sm font-semibold text-amber-700 hover:text-amber-800">
@@ -582,74 +747,206 @@ export default function VendeurPage() {
               </div>
             )}
 
-            {tab === "emplacements" && (
+            {tab === "articles" && !sheetOpen && (
               <div>
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                   <h2 className="text-lg font-bold">
-                    Mes {MAX_FREE} articles gratuits ({products.length} / {MAX_FREE})
+                    Mes articles ({products.length} / {MAX_FREE})
                   </h2>
+                  <button
+                    type="button"
+                    onClick={openNew}
+                    disabled={products.length >= MAX_FREE}
+                    className="bg-amber-600 text-white text-sm font-semibold px-5 py-2.5 rounded-lg hover:bg-amber-700 transition disabled:opacity-50"
+                  >
+                    + Ajouter un article
+                  </button>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                  {slots.map((p, i) =>
-                    p ? (
-                      <div key={p.id} className="bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-sm flex flex-col">
-                        {p.image_url ? (
-                          <img src={p.image_url} alt={p.title} className="w-full h-32 object-cover" />
-                        ) : (
-                          <div className="w-full h-32 bg-stone-100 flex items-center justify-center text-stone-400 text-xs">
-                            Pas de photo
-                          </div>
-                        )}
-                        <div className="p-3 flex-1 flex flex-col">
-                          {editingId === p.id ? (
-                            <div className="flex flex-col gap-2">
-                              <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className={inputClass} />
-                              <input type="text" inputMode="decimal" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} className={inputClass} />
-                              <input type="number" min="0" value={editStock} onChange={(e) => setEditStock(e.target.value)} className={inputClass} />
-                              <div className="flex gap-2">
-                                <button type="button" onClick={() => saveEdit(p.id)} className="text-xs bg-amber-600 text-white px-3 py-1.5 rounded-lg font-semibold hover:bg-amber-700">
-                                  OK
-                                </button>
-                                <button type="button" onClick={() => setEditingId(null)} className="text-xs bg-stone-100 text-stone-700 px-3 py-1.5 rounded-lg hover:bg-stone-200">
-                                  Annuler
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <>
-                              <p className="text-[11px] text-stone-400 mb-1">Emplacement {i + 1}</p>
-                              <h3 className="font-bold text-sm text-stone-900 break-words">{p.title}</h3>
-                              <p className="text-amber-600 font-extrabold text-sm">{euro(p.price_cents)}</p>
-                              <span className={`inline-block mt-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${stockInfo(p.stock).cls}`}>
-                                {stockInfo(p.stock).label}
-                              </span>
-                              <div className="mt-auto pt-3 flex gap-2">
-                                <button type="button" onClick={() => startEdit(p)} className="text-xs bg-stone-100 text-stone-700 px-2.5 py-1.5 rounded-lg font-medium hover:bg-stone-200">
-                                  Modifier
-                                </button>
-                                <button type="button" onClick={() => handleDelete(p.id)} className="text-xs bg-red-50 text-red-600 px-2.5 py-1.5 rounded-lg font-medium hover:bg-red-100">
-                                  Retirer
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
+
+                <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
+                  {products.length === 0 ? (
+                    <div className="p-10 text-center text-stone-500 text-sm">
+                      Aucun article pour le moment. Cliquez sur « Ajouter un article » pour créer votre première fiche produit.
+                    </div>
+                  ) : (
+                    products.map((p) => (
                       <button
-                        key={"vide-" + i}
+                        key={p.id}
                         type="button"
-                        onClick={() => setShowAdd(true)}
-                        className="min-h-[220px] rounded-2xl border-2 border-dashed border-stone-300 bg-white/60 text-stone-400 flex flex-col items-center justify-center gap-1 hover:border-amber-500 hover:text-amber-600 hover:bg-amber-50 transition"
+                        onClick={() => openEdit(p)}
+                        className="w-full flex items-center gap-4 p-4 border-b border-stone-100 last:border-0 text-left hover:bg-stone-50 transition"
                       >
-                        <span className="text-3xl leading-none">+</span>
-                        <span className="text-xs font-semibold">Emplacement {i + 1}</span>
-                        <span className="text-[11px]">Libre</span>
+                        {thumb(p, "w-14 h-14 shrink-0")}
+                        <span className="flex-1 min-w-0">
+                          <span className="block font-semibold text-stone-900 truncate">{p.title}</span>
+                          <span className="block text-xs text-stone-500">
+                            {categoryLabel(p.category)}
+                            {variantsOf(p.id).length > 0
+                              ? ` · ${variantsOf(p.id).length} variante${variantsOf(p.id).length > 1 ? "s" : ""}`
+                              : " · Sans variante"}
+                          </span>
+                        </span>
+                        <span className={`hidden sm:inline text-xs font-semibold px-3 py-1 rounded-full whitespace-nowrap ${stockInfo(p.stock).cls}`}>
+                          {stockInfo(p.stock).label}
+                        </span>
+                        <span className="font-bold text-amber-600 whitespace-nowrap">{euro(p.price_cents)}</span>
                       </button>
-                    )
+                    ))
                   )}
                 </div>
+                {products.length < MAX_FREE && (
+                  <p className="text-xs text-stone-500 mt-3">
+                    Il vous reste {MAX_FREE - products.length} emplacement{MAX_FREE - products.length > 1 ? "s" : ""} gratuit{MAX_FREE - products.length > 1 ? "s" : ""}. Chaque couleur différente peut être une variante, ou un article à part.
+                  </p>
+                )}
               </div>
+            )}
+
+            {tab === "articles" && sheetOpen && (
+              <form onSubmit={saveSheet}>
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <button type="button" onClick={() => setSheetOpen(false)} className="text-sm font-semibold text-stone-600 hover:text-stone-900">
+                    ← Retour aux articles
+                  </button>
+                  <h2 className="text-lg font-bold">{sheetId ? "Fiche produit" : "Nouvel article"}</h2>
+                </div>
+
+                <div className="grid lg:grid-cols-3 gap-6 items-start">
+                  <div className="lg:col-span-2 flex flex-col gap-6">
+                    <div className={cardClass}>
+                      <div className="flex flex-col gap-4">
+                        <div>
+                          <label htmlFor="fTitle" className={labelClass}>Titre</label>
+                          <input id="fTitle" type="text" value={fTitle} onChange={(e) => setFTitle(e.target.value)} required maxLength={120} className={inputClass} />
+                        </div>
+                        <div>
+                          <label htmlFor="fDesc" className={labelClass}>Description</label>
+                          <textarea id="fDesc" rows={5} value={fDesc} onChange={(e) => setFDesc(e.target.value)} maxLength={2000} className={inputClass} />
+                        </div>
+                        <div>
+                          <label htmlFor="fCategory" className={labelClass}>Catégorie</label>
+                          <select id="fCategory" value={fCategory} onChange={(e) => setFCategory(e.target.value)} className={inputClass}>
+                            <option value="">Choisir une catégorie</option>
+                            {CATEGORIES.map((c) => (
+                              <option key={c.value} value={c.value}>
+                                {c.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={cardClass}>
+                      <h3 className="font-bold mb-1">Variantes</h3>
+                      <p className="text-xs text-stone-500 mb-4">
+                        Par exemple des tailles (S, M, L), chacune avec son propre stock. Sans variante, l’article n’a qu’un seul stock.
+                      </p>
+
+                      {fVariants.length > 0 && (
+                        <div className="flex flex-col gap-2 mb-4">
+                          <div className="grid grid-cols-[1fr_110px_36px] gap-2 text-xs text-stone-500">
+                            <span>Nom de la variante</span>
+                            <span>Stock</span>
+                            <span />
+                          </div>
+                          {fVariants.map((v, i) => (
+                            <div key={i} className="grid grid-cols-[1fr_110px_36px] gap-2 items-center">
+                              <input
+                                type="text"
+                                aria-label={`Nom de la variante ${i + 1}`}
+                                value={v.label}
+                                maxLength={30}
+                                onChange={(e) => updateVariantRow(i, { label: e.target.value })}
+                                placeholder="S, M, L..."
+                                className={inputClass}
+                              />
+                              <input
+                                type="number"
+                                min="0"
+                                aria-label={`Stock de la variante ${i + 1}`}
+                                value={v.stock}
+                                onChange={(e) => updateVariantRow(i, { stock: e.target.value })}
+                                className={inputClass}
+                              />
+                              <button
+                                type="button"
+                                aria-label={`Supprimer la variante ${i + 1}`}
+                                onClick={() => removeVariantRow(i)}
+                                className="h-9 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 font-bold"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={addVariantRow} className="text-sm font-semibold border border-stone-300 px-4 py-2 rounded-lg hover:bg-stone-100 transition">
+                          + Ajouter une variante
+                        </button>
+                        <button type="button" onClick={addStandardSizes} className="text-sm font-semibold text-amber-700 border border-amber-300 px-4 py-2 rounded-lg hover:bg-amber-50 transition">
+                          Ajouter S, M, L
+                        </button>
+                      </div>
+
+                      {fVariants.length === 0 && (
+                        <div className="mt-4 max-w-xs">
+                          <label htmlFor="fStock" className={labelClass}>Stock de l’article</label>
+                          <input id="fStock" type="number" min="0" value={fStock} onChange={(e) => setFStock(e.target.value)} className={inputClass} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-6">
+                    <div className={cardClass}>
+                      <h3 className="font-bold mb-3">Photo</h3>
+                      {fImage ? (
+                        <img src={fImage} alt="Aperçu de l’article" className="w-full h-48 object-cover rounded-lg border border-stone-200 mb-3" />
+                      ) : (
+                        <div className="w-full h-48 rounded-lg bg-stone-100 border border-stone-200 flex items-center justify-center text-sm text-stone-400 mb-3">
+                          Pas de photo
+                        </div>
+                      )}
+                      <input
+                        key={fileKey}
+                        type="file"
+                        accept="image/*"
+                        aria-label="Choisir une photo"
+                        onChange={(e) => setFFile(e.target.files ? e.target.files.item(0) : null)}
+                        className="text-sm text-stone-600 w-full"
+                      />
+                    </div>
+
+                    <div className={cardClass}>
+                      <h3 className="font-bold mb-3">Prix</h3>
+                      <label htmlFor="fPrice" className={labelClass}>Prix en euros</label>
+                      <input id="fPrice" type="text" inputMode="decimal" value={fPrice} onChange={(e) => setFPrice(e.target.value)} required placeholder="25,00" className={inputClass} />
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      <button
+                        type="submit"
+                        disabled={saving}
+                        className="bg-amber-600 text-white font-semibold py-3 rounded-xl hover:bg-amber-700 transition disabled:opacity-50"
+                      >
+                        {saving ? "Enregistrement..." : sheetId ? "Enregistrer la fiche" : "Publier dans ma boutique"}
+                      </button>
+                      {sheetId && (
+                        <button
+                          type="button"
+                          onClick={() => deleteProduct(sheetId)}
+                          className="text-sm font-semibold text-red-600 bg-red-50 py-2.5 rounded-xl hover:bg-red-100 transition"
+                        >
+                          Retirer cet article
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </form>
             )}
 
             {tab === "stock" && (
@@ -658,8 +955,7 @@ export default function VendeurPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-left text-xs text-stone-500 border-b border-stone-200">
-                        <th className="p-4 font-medium">Article</th>
-                        <th className="p-4 font-medium">Prix</th>
+                        <th className="p-4 font-medium">Article / variante</th>
                         <th className="p-4 font-medium">Stock</th>
                         <th className="p-4 font-medium">Ajuster</th>
                         <th className="p-4 font-medium">État</th>
@@ -668,41 +964,75 @@ export default function VendeurPage() {
                     <tbody>
                       {products.length === 0 && (
                         <tr>
-                          <td colSpan={5} className="p-8 text-center text-stone-500">
+                          <td colSpan={4} className="p-8 text-center text-stone-500">
                             Aucun article pour le moment.
                           </td>
                         </tr>
                       )}
-                      {products.map((p) => (
-                        <tr key={p.id} className="border-b border-stone-100 last:border-0">
-                          <td className="p-4 font-semibold">{p.title}</td>
-                          <td className="p-4">{euro(p.price_cents)}</td>
-                          <td className="p-4 font-bold">{p.stock}</td>
-                          <td className="p-4">
-                            <div className="flex items-center gap-2">
-                              <button type="button" aria-label="Retirer une pièce" onClick={() => adjustStock(p, -1)} className="w-8 h-8 rounded-lg bg-stone-100 hover:bg-stone-200 font-bold">
-                                −
-                              </button>
-                              <button type="button" aria-label="Ajouter une pièce" onClick={() => adjustStock(p, 1)} className="w-8 h-8 rounded-lg bg-stone-100 hover:bg-stone-200 font-bold">
-                                +
-                              </button>
-                            </div>
-                          </td>
-                          <td className="p-4">
-                            <span className={`text-xs font-semibold px-3 py-1 rounded-full ${stockInfo(p.stock).cls}`}>
-                              {p.stock === 0 ? "Épuisé" : p.stock <= 2 ? "Stock faible" : "Disponible"}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                      {products.map((p) => {
+                        const vs = variantsOf(p.id);
+                        return (
+                          <Fragment key={p.id}>
+                            <tr className="border-b border-stone-100 bg-stone-50">
+                              <td className="p-4 font-semibold">
+                                <span className="flex items-center gap-3">
+                                  {thumb(p, "w-9 h-9 shrink-0")}
+                                  {p.title}
+                                </span>
+                              </td>
+                              <td className="p-4 font-bold">{p.stock}</td>
+                              <td className="p-4">
+                                {vs.length === 0 ? (
+                                  <div className="flex items-center gap-2">
+                                    <button type="button" aria-label="Retirer une pièce" onClick={() => adjustProductStock(p, -1)} className="w-8 h-8 rounded-lg bg-white border border-stone-200 hover:bg-stone-100 font-bold">
+                                      −
+                                    </button>
+                                    <button type="button" aria-label="Ajouter une pièce" onClick={() => adjustProductStock(p, 1)} className="w-8 h-8 rounded-lg bg-white border border-stone-200 hover:bg-stone-100 font-bold">
+                                      +
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-stone-400">Par variante</span>
+                                )}
+                              </td>
+                              <td className="p-4">
+                                <span className={`text-xs font-semibold px-3 py-1 rounded-full ${stockInfo(p.stock).cls}`}>
+                                  {p.stock === 0 ? "Épuisé" : p.stock <= 2 ? "Stock faible" : "Disponible"}
+                                </span>
+                              </td>
+                            </tr>
+                            {vs.map((v) => (
+                              <tr key={v.id} className="border-b border-stone-100 last:border-0">
+                                <td className="p-4 pl-16 text-stone-700">{v.label}</td>
+                                <td className="p-4 font-bold">{v.stock}</td>
+                                <td className="p-4">
+                                  <div className="flex items-center gap-2">
+                                    <button type="button" aria-label={`Retirer une pièce, ${v.label}`} onClick={() => adjustVariantStock(v, -1)} className="w-8 h-8 rounded-lg bg-stone-100 hover:bg-stone-200 font-bold">
+                                      −
+                                    </button>
+                                    <button type="button" aria-label={`Ajouter une pièce, ${v.label}`} onClick={() => adjustVariantStock(v, 1)} className="w-8 h-8 rounded-lg bg-stone-100 hover:bg-stone-200 font-bold">
+                                      +
+                                    </button>
+                                  </div>
+                                </td>
+                                <td className="p-4">
+                                  <span className={`text-xs font-semibold px-3 py-1 rounded-full ${stockInfo(v.stock).cls}`}>
+                                    {v.stock === 0 ? "Épuisé" : v.stock <= 2 ? "Stock faible" : "Disponible"}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </Fragment>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
 
-                <div className="bg-white p-6 rounded-2xl border border-stone-200 shadow-sm">
+                <div className={cardClass}>
                   <h2 className="text-lg font-bold mb-1">Import et export (CSV)</h2>
                   <p className="text-xs text-stone-500 mb-4">
-                    Fichier à trois colonnes : titre, prix, stock. Ouvrable avec Excel ou Google Sheets.
+                    Colonnes : titre, prix, stock, catégorie (femme, homme, enfant ou autre) et description. Les variantes se gèrent dans la fiche de chaque article.
                   </p>
                   <div className="flex flex-wrap gap-3">
                     <button type="button" onClick={exportProducts} className="bg-stone-900 text-white text-sm font-semibold px-5 py-2.5 rounded-lg hover:bg-stone-800 transition">
@@ -743,7 +1073,7 @@ export default function VendeurPage() {
                 ) : (
                   <div className="flex flex-col gap-4">
                     {sales.map((s) => (
-                      <div key={s.id} className="bg-white p-5 rounded-2xl border border-stone-200 shadow-sm">
+                      <div key={s.id} className={cardClass}>
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
                             <p className="font-bold text-stone-900">
@@ -802,44 +1132,6 @@ export default function VendeurPage() {
           </>
         )}
       </main>
-
-      {showAdd && (
-        <div className="fixed inset-0 z-20 bg-black/50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold">Ajouter un article</h2>
-              <button type="button" onClick={() => setShowAdd(false)} className="text-sm text-stone-500 hover:text-stone-900">
-                Fermer ✕
-              </button>
-            </div>
-            <form onSubmit={handleAddProduct} className="flex flex-col gap-3">
-              <div>
-                <label htmlFor="photo" className="block text-xs font-medium text-stone-600 mb-1">
-                  Photo
-                </label>
-                <input
-                  id="photo"
-                  key={fileKey}
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setFile(e.target.files ? e.target.files.item(0) : null)}
-                  className="text-sm text-stone-600"
-                />
-              </div>
-              <input type="text" placeholder="Nom de la création" value={title} onChange={(e) => setTitle(e.target.value)} required className={inputClass} />
-              <input type="text" inputMode="decimal" placeholder="Prix (€)" value={price} onChange={(e) => setPrice(e.target.value)} required className={inputClass} />
-              <input type="number" min="0" placeholder="Quantité en stock" value={stock} onChange={(e) => setStock(e.target.value)} className={inputClass} />
-              <button
-                type="submit"
-                disabled={saving}
-                className="mt-2 bg-amber-600 text-white font-semibold py-2.5 rounded-lg hover:bg-amber-700 transition disabled:opacity-50"
-              >
-                {saving ? "Publication..." : "+ Publier dans ma boutique"}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
