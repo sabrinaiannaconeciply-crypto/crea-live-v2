@@ -111,7 +111,7 @@ export default function VideoPage() {
       <header className="bg-stone-900 border-b border-stone-800 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="text-xl font-extrabold tracking-tight text-white">
-            CRÉA-LIVE <span className="text-amber-500">MARKET</span>
+            AVENUE DES <span className="text-amber-600">CRÉATEURS</span>
           </Link>
           <nav className="flex items-center gap-6 text-sm font-medium">
             <Link href="/" className="text-stone-300 hover:text-white">Accueil</Link>
