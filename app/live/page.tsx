@@ -145,7 +145,7 @@ export default function LivePage() {
               </div>
             ) : (
               <div className="bg-stone-900 rounded-2xl border border-stone-800 p-10 text-center text-stone-400">
-                La vidéo s'affichera ici une fois publiée.
+                La vidéo s&apos;affichera ici une fois publiée.
               </div>
             )}
           </div>
