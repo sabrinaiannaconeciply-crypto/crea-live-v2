@@ -13,7 +13,10 @@ export default function VideoPage() {
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("1");
   const [categorie, setCategorie] = useState("Vêtement");
-  const [variantes, setVariantes] = useState(""); // ex: S, M, L
+  
+  // NOUVEAU : Gestion des variantes sous forme de liste
+  const [variantes, setVariantes] = useState<string[]>([""]); 
+  
   const [isUploading, setIsUploading] = useState(false);
 
   const fetchProducts = async () => {
@@ -31,6 +34,24 @@ export default function VideoPage() {
     fetchProducts();
   }, []);
 
+  // Fonction pour ajouter une case vide
+  const ajouterVariante = () => {
+    setVariantes([...variantes, ""]);
+  };
+
+  // Fonction pour mettre à jour une case spécifique
+  const modifierVariante = (index: number, valeur: string) => {
+    const nouvellesVariantes = [...variantes];
+    nouvellesVariantes[index] = valeur;
+    setVariantes(nouvellesVariantes);
+  };
+
+  // Fonction pour supprimer une case
+  const supprimerVariante = (index: number) => {
+    const nouvellesVariantes = variantes.filter((_, i) => i !== index);
+    setVariantes(nouvellesVariantes.length > 0 ? nouvellesVariantes : [""]);
+  };
+
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !price) return alert("Veuillez remplir le nom et le prix.");
@@ -39,7 +60,6 @@ export default function VideoPage() {
     let imageUrl = "";
     let uploadedVideoUrl = "";
 
-    // 1. Upload Photo
     if (file) {
       const fileExt = file.name.split(".").pop();
       const fileName = `img-${Date.now()}.${fileExt}`;
@@ -50,7 +70,6 @@ export default function VideoPage() {
       }
     }
 
-    // 2. Upload Vidéo
     if (videoFile) {
       const fileExt = videoFile.name.split(".").pop();
       const fileName = `video-${Date.now()}.${fileExt}`;
@@ -61,10 +80,9 @@ export default function VideoPage() {
       }
     }
 
-    // 3. Préparer les variantes (ex: "S, M, L" devient un tableau)
-    const variantesArray = variantes.split(",").map(v => v.trim()).filter(v => v !== "");
+    // On nettoie les variantes (on enlève les cases vides)
+    const variantesPropres = variantes.map(v => v.trim()).filter(v => v !== "");
 
-    // 4. Insertion
     const { error } = await supabase.from("live_stock").insert([{
       title: title,
       price_cents: Math.round(parseFloat(price) * 100),
@@ -72,7 +90,7 @@ export default function VideoPage() {
       stock: parseInt(stock),
       video_url: uploadedVideoUrl || null,
       categorie: categorie,
-      variantes: variantesArray.length > 0 ? variantesArray : null,
+      variantes: variantesPropres.length > 0 ? variantesPropres : null,
       seller_id: "00000000-0000-0000-0000-000000000000",
       status: "actif",
     }]);
@@ -81,15 +99,11 @@ export default function VideoPage() {
 
     if (!error) {
       alert("Produit et vidéo ajoutés !");
-      setTitle(""); setPrice(""); setFile(null); setVideoFile(null); setStock("1"); setVariantes("");
+      setTitle(""); setPrice(""); setFile(null); setVideoFile(null); setStock("1"); setVariantes([""]);
       fetchProducts();
     } else {
       alert("Erreur : " + error.message);
     }
-  };
-
-  const handleAddToCart = (product: any, selectedSize: string) => {
-    alert(`Ajouté au panier : ${product.title} - Taille : ${selectedSize}`);
   };
 
   return (
@@ -119,6 +133,7 @@ export default function VideoPage() {
           <div className="bg-stone-900 p-6 rounded-2xl border border-stone-800">
             <h2 className="text-lg font-bold mb-4">Ajouter un produit</h2>
             <form onSubmit={handleAddProduct} className="flex flex-col gap-3">
+              {/* ... (Photo et Vidéo inchangés) ... */}
               <div>
                 <label className="block text-xs text-stone-400 mb-1">Photo (facultatif)</label>
                 <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] || null)} className="text-sm text-stone-300" />
@@ -139,15 +154,43 @@ export default function VideoPage() {
                 <option value="Autre">Autre</option>
               </select>
 
-              <input type="text" placeholder="Options (ex: S, M, L ou 50ml, 100ml)" value={variantes} onChange={(e) => setVariantes(e.target.value)} className="p-2.5 bg-stone-800 border border-stone-700 rounded-lg text-sm text-white" />
-              <p className="text-xs text-stone-500">Séparez les options par des virgules.</p>
+              {/* NOUVEAU : Gestion dynamique des variantes */}
+              <div className="mt-2">
+                <label className="block text-xs text-stone-400 mb-2">Variantes (Tailles, Couleurs, etc.)</label>
+                {variantes.map((v, index) => (
+                  <div key={index} className="flex gap-2 mb-2">
+                    <input 
+                      type="text" 
+                      placeholder={`Ex: ${index === 0 ? 'S' : index === 1 ? 'M' : 'L'}`} 
+                      value={v} 
+                      onChange={(e) => modifierVariante(index, e.target.value)} 
+                      className="flex-1 p-2 bg-stone-800 border border-stone-700 rounded-lg text-sm text-white" 
+                    />
+                    <button 
+                      type="button" 
+                      onClick={() => supprimerVariante(index)}
+                      className="px-3 bg-red-900/50 text-red-400 rounded-lg hover:bg-red-900"
+                    >
+                      X
+                    </button>
+                  </div>
+                ))}
+                <button 
+                  type="button" 
+                  onClick={ajouterVariante}
+                  className="text-sm text-amber-500 hover:text-amber-400 font-semibold flex items-center gap-1 mt-1"
+                >
+                  + Ajouter une option
+                </button>
+              </div>
 
-              <button type="submit" disabled={isUploading} className="mt-2 bg-red-600 text-white font-semibold py-2.5 rounded-lg hover:bg-red-700 transition disabled:opacity-50">
+              <button type="submit" disabled={isUploading} className="mt-4 bg-red-600 text-white font-semibold py-2.5 rounded-lg hover:bg-red-700 transition disabled:opacity-50">
                 {isUploading ? "Upload en cours..." : "+ Publier la vidéo et le produit"}
               </button>
             </form>
           </div>
 
+          {/* ... (Lecteur vidéo inchangé) ... */}
           <div className="lg:col-span-2">
             {products.length > 0 && products[0].video_url ? (
               <div className="bg-black rounded-2xl overflow-hidden aspect-video flex items-center justify-center border border-stone-800">
@@ -182,7 +225,7 @@ export default function VideoPage() {
                     <p className="text-xs text-stone-500 mb-3">Stock: {p.stock}</p>
                   </div>
 
-                  {/* Gestion des variantes (tailles) */}
+                  {/* Affichage des variantes pour l'acheteur */}
                   {p.variantes && p.variantes.length > 0 && (
                     <div className="mb-3">
                       <p className="text-xs text-stone-400 mb-2">Choisir une option :</p>
@@ -190,7 +233,7 @@ export default function VideoPage() {
                         {p.variantes.map((v: string) => (
                           <button
                             key={v}
-                            onClick={() => handleAddToCart(p, v)}
+                            onClick={() => alert(`Ajouté au panier : ${p.title} - ${v}`)}
                             className="px-3 py-1 bg-stone-800 text-stone-200 text-sm rounded-full hover:bg-amber-600 hover:text-white transition"
                           >
                             {v}
@@ -203,7 +246,7 @@ export default function VideoPage() {
                   {/* Si pas de variante, bouton simple */}
                   {(!p.variantes || p.variantes.length === 0) && (
                     <button
-                      onClick={() => handleAddToCart(p, "Unique")}
+                      onClick={() => alert(`Ajouté au panier : ${p.title}`)}
                       className="w-full bg-white text-stone-900 font-bold py-2 rounded-lg hover:bg-stone-200 transition text-sm"
                     >
                       Ajouter au panier
