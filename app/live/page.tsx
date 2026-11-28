@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { supabase } from "../../lib/supabase";
 
-export default function LivePage() {
+export default function VideoPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [file, setFile] = useState<File | null>(null);
@@ -12,10 +12,11 @@ export default function LivePage() {
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("1");
-  const [videoUrl, setVideoUrl] = useState(""); // Pour stocker l'URL finale
+  const [categorie, setCategorie] = useState("");
+  const [options, setOptions] = useState("");
   const [isUploading, setIsUploading] = useState(false);
 
-  const fetchLiveProducts = async () => {
+  const fetchProducts = async () => {
     const { data, error } = await supabase
       .from("live_stock")
       .select("*")
@@ -27,7 +28,7 @@ export default function LivePage() {
   };
 
   useEffect(() => {
-    fetchLiveProducts();
+    fetchProducts();
   }, []);
 
   const handleAddProduct = async (e: React.FormEvent) => {
@@ -38,7 +39,7 @@ export default function LivePage() {
     let imageUrl = "";
     let uploadedVideoUrl = "";
 
-    // 1. Upload de la photo (facultatif)
+    // 1. Upload de la photo
     if (file) {
       const fileExt = file.name.split(".").pop();
       const fileName = `img-${Date.now()}.${fileExt}`;
@@ -49,7 +50,7 @@ export default function LivePage() {
       }
     }
 
-    // 2. Upload de la vidéo (si un fichier est sélectionné)
+    // 2. Upload de la vidéo
     if (videoFile) {
       const fileExt = videoFile.name.split(".").pop();
       const fileName = `video-${Date.now()}.${fileExt}`;
@@ -57,20 +58,19 @@ export default function LivePage() {
       if (!uploadError) {
         const { data } = supabase.storage.from("products").getPublicUrl(fileName);
         uploadedVideoUrl = data.publicUrl;
-        setVideoUrl(uploadedVideoUrl);
-      } else {
-        alert("Erreur lors de l'upload de la vidéo : " + uploadError.message);
       }
     }
 
-    // 3. Insertion dans la base de données
+    // 3. Insertion
     const { error } = await supabase.from("live_stock").insert([{
       title: title,
       price_cents: Math.round(parseFloat(price) * 100),
       image_url: imageUrl,
       stock: parseInt(stock),
-      video_url: uploadedVideoUrl || null, // Lien de la vidéo
-      seller_id: "vendeur-live",
+      video_url: uploadedVideoUrl || null,
+      categorie: categorie,
+      options: options,
+      seller_id: "vendeur-video",
       status: "actif",
     }]);
 
@@ -78,8 +78,8 @@ export default function LivePage() {
 
     if (!error) {
       alert("Produit et vidéo ajoutés !");
-      setTitle(""); setPrice(""); setFile(null); setVideoFile(null); setStock("1");
-      fetchLiveProducts();
+      setTitle(""); setPrice(""); setFile(null); setVideoFile(null); setStock("1"); setCategorie(""); setOptions("");
+      fetchProducts();
     } else {
       alert("Erreur : " + error.message);
     }
@@ -96,8 +96,7 @@ export default function LivePage() {
             <Link href="/" className="text-stone-300 hover:text-white">Accueil</Link>
             <Link href="/boutique" className="text-stone-300 hover:text-white">La Boutique</Link>
             <Link href="/live" className="bg-red-600 text-white px-4 py-2 rounded-full font-bold flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-              Espace Live
+              Espace Vidéo
             </Link>
           </nav>
         </div>
@@ -109,10 +108,7 @@ export default function LivePage() {
           <p className="text-stone-400 text-sm mt-2">Importez votre vidéo et ajoutez les produits associés.</p>
         </div>
 
-        {/* SECTION 1 : Vidéo et Formulaire */}
         <div className="grid lg:grid-cols-3 gap-8 items-start">
-          
-          {/* Formulaire d'upload */}
           <div className="bg-stone-900 p-6 rounded-2xl border border-stone-800">
             <h2 className="text-lg font-bold mb-4">Ajouter un produit</h2>
             <form onSubmit={handleAddProduct} className="flex flex-col gap-3">
@@ -122,26 +118,26 @@ export default function LivePage() {
               </div>
               <div>
                 <label className="block text-xs text-stone-400 mb-1">Vidéo (MP4, MOV)</label>
-                <input type="file" accept="video/mp4,video/quicktime,video/mov" onChange={(e) => setVideoFile(e.target.files?.[0] || null)} className="text-sm text-stone-300" />
+                <input type="file" accept="video/mp4,video/quicktime" onChange={(e) => setVideoFile(e.target.files?.[0] || null)} className="text-sm text-stone-300" />
               </div>
               <input type="text" placeholder="Nom du produit" value={title} onChange={(e) => setTitle(e.target.value)} required className="p-2.5 bg-stone-800 border border-stone-700 rounded-lg text-sm text-white" />
               <input type="number" step="0.01" min="0.50" placeholder="Prix (€)" value={price} onChange={(e) => setPrice(e.target.value)} required className="p-2.5 bg-stone-800 border border-stone-700 rounded-lg text-sm text-white" />
               <input type="number" min="1" placeholder="Stock" value={stock} onChange={(e) => setStock(e.target.value)} className="p-2.5 bg-stone-800 border border-stone-700 rounded-lg text-sm text-white" />
+              
+              {/* Champs pour les catégories et options */}
+              <input type="text" placeholder="Catégorie (ex: Vêtement, Bougie, Parfum)" value={categorie} onChange={(e) => setCategorie(e.target.value)} className="p-2.5 bg-stone-800 border border-stone-700 rounded-lg text-sm text-white" />
+              <input type="text" placeholder="Options (ex: S, M, L ou 50ml, 100ml)" value={options} onChange={(e) => setOptions(e.target.value)} className="p-2.5 bg-stone-800 border border-stone-700 rounded-lg text-sm text-white" />
+
               <button type="submit" disabled={isUploading} className="mt-2 bg-red-600 text-white font-semibold py-2.5 rounded-lg hover:bg-red-700 transition disabled:opacity-50">
                 {isUploading ? "Upload en cours..." : "+ Publier la vidéo et le produit"}
               </button>
             </form>
           </div>
 
-          {/* Lecteur vidéo (Affiché une fois uploadée) */}
           <div className="lg:col-span-2">
             {products.length > 0 && products[0].video_url ? (
               <div className="bg-black rounded-2xl overflow-hidden aspect-video flex items-center justify-center border border-stone-800">
-                <video 
-                  src={products[0].video_url} 
-                  controls 
-                  className="w-full h-full object-contain" 
-                />
+                <video src={products[0].video_url} controls className="w-full h-full object-contain" />
               </div>
             ) : (
               <div className="bg-stone-900 rounded-2xl border border-stone-800 p-10 text-center text-stone-400">
@@ -151,7 +147,6 @@ export default function LivePage() {
           </div>
         </div>
 
-        {/* SECTION 2 : Grille des produits en dessous */}
         <div className="mt-12">
           <h2 className="text-2xl font-bold mb-6">Produits présentés dans la vidéo</h2>
           {loading ? <p>Chargement...</p> : products.length === 0 ? (
@@ -167,6 +162,11 @@ export default function LivePage() {
                   )}
                   <h3 className="font-bold text-sm truncate">{p.title}</h3>
                   <p className="text-amber-400 font-bold">{(p.price_cents / 100).toFixed(2)} €</p>
+                  
+                  {/* Affichage de la catégorie et des options */}
+                  {p.categorie && <p className="text-xs text-stone-400">Catégorie : {p.categorie}</p>}
+                  {p.options && <p className="text-xs text-stone-400">Options : {p.options}</p>}
+                  
                   <p className="text-xs text-stone-500 mb-2">Stock: {p.stock}</p>
                   <button 
                     onClick={() => alert(`Ajouté au panier : ${p.title}`)}
