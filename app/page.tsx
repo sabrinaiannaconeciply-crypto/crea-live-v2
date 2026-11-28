@@ -1,124 +1,110 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { supabase } from "../../lib/supabase";
 
-export default function HomePage() {
+export default function VideoBoutiquePage() {
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      const { data, error } = await supabase
+        .from("live_stock")
+        .select("*")
+        .eq("status", "actif")
+        .order("created_at", { ascending: false });
+
+      if (!error && data) setProducts(data);
+      setLoading(false);
+    };
+    fetchProducts();
+  }, []);
+
   return (
-    <div className="min-h-screen bg-stone-50 text-stone-900 flex flex-col">
-      {/* Barre de navigation */}
-      <header className="bg-white border-b border-stone-200 sticky top-0 z-10">
+    <div className="min-h-screen bg-stone-950 text-white">
+      <header className="bg-stone-900 border-b border-stone-800 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="text-xl font-extrabold tracking-tight text-stone-900">
-            CRÉA-LIVE <span className="text-amber-600">MARKET</span>
+          <Link href="/" className="text-xl font-extrabold tracking-tight text-white">
+            CRÉA-LIVE <span className="text-amber-500">MARKET</span>
           </Link>
-          <nav className="flex items-center gap-4 text-sm font-medium">
-            <Link href="/boutique" className="text-stone-700 hover:text-amber-600 transition">
-              Boutique
-            </Link>
-            <Link href="/vendeur" className="text-stone-700 hover:text-amber-600 transition">
-              Espace Vendeur
-            </Link>
-            <Link href="/live" className="text-stone-700 hover:text-amber-600 transition">
-              Live
-            </Link>
-            <Link
-              href="/connexion"
-              className="bg-amber-600 text-white px-4 py-2 rounded-full font-semibold hover:bg-amber-700 transition"
-            >
-              Inscription / Connexion
-            </Link>
-            <Link
-              href="/profil"
-              className="border border-stone-300 text-stone-800 px-4 py-2 rounded-full font-semibold hover:bg-stone-100 transition"
-            >
-              Mon Profil
+          <nav className="flex items-center gap-6 text-sm font-medium">
+            <Link href="/" className="text-stone-300 hover:text-white">Accueil</Link>
+            <Link href="/boutique" className="text-stone-300 hover:text-white">La Boutique</Link>
+            <Link href="/video" className="bg-amber-600 text-white px-4 py-2 rounded-full font-bold">
+              Voir les vidéos
             </Link>
           </nav>
         </div>
       </header>
 
-      {/* Section principale */}
-      <main className="flex-1 max-w-6xl mx-auto px-6 py-16 flex flex-col justify-center">
-        <div className="text-center max-w-3xl mx-auto mb-12">
-          <span className="inline-block bg-amber-100 text-amber-800 text-xs font-semibold px-3 py-1 rounded-full mb-4">
-            Artisanat • Création • Vente en direct
-          </span>
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-stone-900 mb-6">
-            La plateforme des créateurs et de leurs clients.
-          </h1>
-          <p className="text-lg text-stone-600 mb-8">
-            Inscrivez-vous en tant que <strong>Vendeur</strong> pour ouvrir votre boutique et lancer vos lives, ou en tant que <strong>Client</strong> pour commander.
-          </p>
-
-          {/* Deux gros boutons d'inscription immédiats */}
-          <div className="flex flex-wrap justify-center gap-4">
-            <Link
-              href="/connexion"
-              className="bg-stone-900 text-white font-bold py-4 px-8 rounded-2xl hover:bg-stone-800 transition shadow-sm"
-            >
-              🏪 Ouvrir un compte Vendeur
-            </Link>
-            <Link
-              href="/connexion"
-              className="bg-amber-600 text-white font-bold py-4 px-8 rounded-2xl hover:bg-amber-700 transition shadow-sm"
-            >
-              🛍️ Créer un compte Client
-            </Link>
-          </div>
+      <main className="max-w-6xl mx-auto px-6 py-10">
+        <div className="mb-8">
+          <h1 className="text-3xl font-extrabold">La Vitrine Vidéo</h1>
+          <p className="text-stone-400 text-sm mt-2">Découvrez les créations présentées en vidéo par nos vendeurs.</p>
         </div>
 
-        {/* Trois espaces bien distincts */}
-        <div className="grid md:grid-cols-3 gap-8">
-          <div className="bg-white p-8 rounded-2xl border border-stone-200 shadow-sm flex flex-col justify-between">
-            <div>
-              <h2 className="text-xl font-bold mb-2">1. La Boutique</h2>
-              <p className="text-stone-600 text-sm mb-6">
-                Explorez les créations disponibles et ajoutez-les à votre panier.
-              </p>
-            </div>
-            <Link
-              href="/boutique"
-              className="w-full text-center bg-stone-100 text-stone-900 font-semibold py-3 rounded-xl hover:bg-stone-200 transition text-sm"
-            >
-              Voir la Boutique
-            </Link>
+        {loading ? (
+          <p className="text-stone-400">Chargement des vidéos...</p>
+        ) : products.length === 0 ? (
+          <div className="bg-stone-900 p-10 rounded-2xl border border-stone-800 text-center text-stone-400">
+            Aucune vidéo publiée pour le moment.
           </div>
-
-          <div className="bg-white p-8 rounded-2xl border border-stone-200 shadow-sm flex flex-col justify-between">
-            <div>
-              <h2 className="text-xl font-bold mb-2">2. Espace Vendeur</h2>
-              <p className="text-stone-600 text-sm mb-6">
-                Réservé aux vendeurs inscrits : gérez vos coordonnées, votre stock et vos ventes.
-              </p>
-            </div>
-            <Link
-              href="/vendeur"
-              className="w-full text-center bg-stone-100 text-stone-900 font-semibold py-3 rounded-xl hover:bg-stone-200 transition text-sm"
-            >
-              Accéder à mon Espace Vendeur
-            </Link>
+        ) : (
+          <div className="space-y-12">
+            {products.map((p) => (
+              <div key={p.id} className="bg-stone-900 rounded-2xl border border-stone-800 overflow-hidden">
+                {/* Zone Vidéo */}
+                {p.video_url && (
+                  <div className="bg-black aspect-video flex items-center justify-center">
+                    <video src={p.video_url} controls className="w-full h-full object-contain" />
+                  </div>
+                )}
+                
+                {/* Zone Produits (sous la vidéo) */}
+                <div className="p-6">
+                  <h2 className="text-2xl font-bold mb-4">Produits présentés dans cette vidéo</h2>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {/* Note: Ici, on affiche le produit principal pour l'instant, 
+                        mais plus tard on pourra filtrer par vidéo_id */}
+                    <div className="bg-stone-800 rounded-xl p-3 border border-stone-700">
+                      {p.image_url ? (
+                        <img src={p.image_url} alt={p.title} className="w-full h-32 object-cover rounded-lg mb-2" />
+                      ) : (
+                        <div className="w-full h-32 bg-stone-700 rounded-lg mb-2 flex items-center justify-center text-xs text-stone-500">Sans photo</div>
+                      )}
+                      <h3 className="font-bold text-sm truncate">{p.title}</h3>
+                      <p className="text-amber-400 font-bold">{(p.price_cents / 100).toFixed(2)} €</p>
+                      {p.categorie && <p className="text-xs text-stone-400">{p.categorie}</p>}
+                      <p className="text-xs text-stone-500 mb-2">Stock: {p.stock}</p>
+                      
+                      {p.variantes && p.variantes.length > 0 && (
+                        <div className="mb-2">
+                          <p className="text-[10px] text-stone-400 mb-1">Options :</p>
+                          <div className="flex flex-wrap gap-1">
+                            {p.variantes.map((v: string) => (
+                              <button key={v} onClick={() => alert(`Ajouté : ${p.title} - ${v}`)} className="px-2 py-0.5 bg-stone-700 text-xs rounded hover:bg-amber-600 transition">
+                                {v}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {(!p.variantes || p.variantes.length === 0) && (
+                        <button onClick={() => alert(`Ajouté : ${p.title}`)} className="w-full bg-white text-stone-900 text-xs font-bold py-1.5 rounded mt-2 hover:bg-stone-200">
+                          Ajouter au panier
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-
-          <div className="bg-stone-900 text-white p-8 rounded-2xl shadow-sm flex flex-col justify-between">
-            <div>
-              <h2 className="text-xl font-bold mb-2">3. Les Ventes en Live</h2>
-              <p className="text-stone-300 text-sm mb-6">
-                Regardez les créateurs en direct et réservez leurs pièces avant épuisement.
-              </p>
-            </div>
-            <Link
-              href="/live"
-              className="w-full text-center bg-white text-stone-900 font-semibold py-3 rounded-xl hover:bg-stone-100 transition text-sm"
-            >
-              Rejoindre l&apos;Espace Live
-            </Link>
-          </div>
-        </div>
+        )}
       </main>
-
-      <footer className="border-t border-stone-200 py-6 text-center text-sm text-stone-500">
-        © {new Date().getFullYear()} CRÉA-LIVE MARKET — Tous droits réservés
-      </footer>
     </div>
   );
 }
