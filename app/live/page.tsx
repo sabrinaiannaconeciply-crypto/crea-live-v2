@@ -70,7 +70,7 @@ export default function VideoPage() {
       video_url: uploadedVideoUrl || null,
       categorie: categorie,
       options: options,
-      seller_id: "vendeur-video",
+      seller_id: "00000000-0000-0000-0000-000000000000",
       status: "actif",
     }]);
 
