@@ -28,7 +28,7 @@ export default function HomePage() {
       <header className="bg-white border-b border-stone-200 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="text-xl font-extrabold tracking-tight text-stone-900">
-            CRÉA-LIVE <span className="text-amber-600">MARKET</span>
+            AVENUE DES <span className="text-amber-600">CRÉATEURS</span>
           </Link>
           <nav className="flex items-center gap-4 text-sm font-medium">
             <Link href="/boutique" className="text-stone-700 hover:text-amber-600 transition">Boutique</Link>
