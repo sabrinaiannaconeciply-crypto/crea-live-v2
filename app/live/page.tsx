@@ -12,8 +12,8 @@ export default function VideoPage() {
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("1");
-  const [categorie, setCategorie] = useState("");
-  const [options, setOptions] = useState("");
+  const [categorie, setCategorie] = useState("Vêtement");
+  const [variantes, setVariantes] = useState(""); // ex: S, M, L
   const [isUploading, setIsUploading] = useState(false);
 
   const fetchProducts = async () => {
@@ -39,7 +39,7 @@ export default function VideoPage() {
     let imageUrl = "";
     let uploadedVideoUrl = "";
 
-    // 1. Upload de la photo
+    // 1. Upload Photo
     if (file) {
       const fileExt = file.name.split(".").pop();
       const fileName = `img-${Date.now()}.${fileExt}`;
@@ -50,7 +50,7 @@ export default function VideoPage() {
       }
     }
 
-    // 2. Upload de la vidéo
+    // 2. Upload Vidéo
     if (videoFile) {
       const fileExt = videoFile.name.split(".").pop();
       const fileName = `video-${Date.now()}.${fileExt}`;
@@ -61,7 +61,10 @@ export default function VideoPage() {
       }
     }
 
-    // 3. Insertion
+    // 3. Préparer les variantes (ex: "S, M, L" devient un tableau)
+    const variantesArray = variantes.split(",").map(v => v.trim()).filter(v => v !== "");
+
+    // 4. Insertion
     const { error } = await supabase.from("live_stock").insert([{
       title: title,
       price_cents: Math.round(parseFloat(price) * 100),
@@ -69,7 +72,7 @@ export default function VideoPage() {
       stock: parseInt(stock),
       video_url: uploadedVideoUrl || null,
       categorie: categorie,
-      options: options,
+      variantes: variantesArray.length > 0 ? variantesArray : null,
       seller_id: "00000000-0000-0000-0000-000000000000",
       status: "actif",
     }]);
@@ -78,11 +81,15 @@ export default function VideoPage() {
 
     if (!error) {
       alert("Produit et vidéo ajoutés !");
-      setTitle(""); setPrice(""); setFile(null); setVideoFile(null); setStock("1"); setCategorie(""); setOptions("");
+      setTitle(""); setPrice(""); setFile(null); setVideoFile(null); setStock("1"); setVariantes("");
       fetchProducts();
     } else {
       alert("Erreur : " + error.message);
     }
+  };
+
+  const handleAddToCart = (product: any, selectedSize: string) => {
+    alert(`Ajouté au panier : ${product.title} - Taille : ${selectedSize}`);
   };
 
   return (
@@ -124,9 +131,16 @@ export default function VideoPage() {
               <input type="number" step="0.01" min="0.50" placeholder="Prix (€)" value={price} onChange={(e) => setPrice(e.target.value)} required className="p-2.5 bg-stone-800 border border-stone-700 rounded-lg text-sm text-white" />
               <input type="number" min="1" placeholder="Stock" value={stock} onChange={(e) => setStock(e.target.value)} className="p-2.5 bg-stone-800 border border-stone-700 rounded-lg text-sm text-white" />
               
-              {/* Champs pour les catégories et options */}
-              <input type="text" placeholder="Catégorie (ex: Vêtement, Bougie, Parfum)" value={categorie} onChange={(e) => setCategorie(e.target.value)} className="p-2.5 bg-stone-800 border border-stone-700 rounded-lg text-sm text-white" />
-              <input type="text" placeholder="Options (ex: S, M, L ou 50ml, 100ml)" value={options} onChange={(e) => setOptions(e.target.value)} className="p-2.5 bg-stone-800 border border-stone-700 rounded-lg text-sm text-white" />
+              <select value={categorie} onChange={(e) => setCategorie(e.target.value)} className="p-2.5 bg-stone-800 border border-stone-700 rounded-lg text-sm text-white">
+                <option value="Vêtement">Vêtement</option>
+                <option value="Bougie">Bougie</option>
+                <option value="Parfum">Parfum</option>
+                <option value="Décoration">Décoration</option>
+                <option value="Autre">Autre</option>
+              </select>
+
+              <input type="text" placeholder="Options (ex: S, M, L ou 50ml, 100ml)" value={variantes} onChange={(e) => setVariantes(e.target.value)} className="p-2.5 bg-stone-800 border border-stone-700 rounded-lg text-sm text-white" />
+              <p className="text-xs text-stone-500">Séparez les options par des virgules.</p>
 
               <button type="submit" disabled={isUploading} className="mt-2 bg-red-600 text-white font-semibold py-2.5 rounded-lg hover:bg-red-700 transition disabled:opacity-50">
                 {isUploading ? "Upload en cours..." : "+ Publier la vidéo et le produit"}
@@ -152,28 +166,49 @@ export default function VideoPage() {
           {loading ? <p>Chargement...</p> : products.length === 0 ? (
             <div className="bg-stone-900 p-10 rounded-2xl text-center text-stone-400">Aucun produit ajouté pour le moment.</div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {products.map((p) => (
-                <div key={p.id} className="bg-stone-900 rounded-xl border border-stone-800 p-3 flex flex-col justify-between">
-                  {p.image_url ? (
-                    <img src={p.image_url} alt={p.title} className="w-full h-32 object-cover rounded-lg mb-2" />
-                  ) : (
-                    <div className="w-full h-32 bg-stone-800 rounded-lg mb-2 flex items-center justify-center text-xs text-stone-500">Sans photo</div>
+                <div key={p.id} className="bg-stone-900 rounded-xl border border-stone-800 p-4 flex flex-col justify-between">
+                  <div>
+                    {p.image_url ? (
+                      <img src={p.image_url} alt={p.title} className="w-full h-40 object-cover rounded-lg mb-3" />
+                    ) : (
+                      <div className="w-full h-40 bg-stone-800 rounded-lg mb-3 flex items-center justify-center text-xs text-stone-500">Sans photo</div>
+                    )}
+                    <h3 className="font-bold text-lg">{p.title}</h3>
+                    <p className="text-amber-400 font-bold text-xl mt-1">{(p.price_cents / 100).toFixed(2)} €</p>
+                    
+                    {p.categorie && <p className="text-xs text-stone-400 mt-1">Catégorie : {p.categorie}</p>}
+                    <p className="text-xs text-stone-500 mb-3">Stock: {p.stock}</p>
+                  </div>
+
+                  {/* Gestion des variantes (tailles) */}
+                  {p.variantes && p.variantes.length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-xs text-stone-400 mb-2">Choisir une option :</p>
+                      <div className="flex flex-wrap gap-2">
+                        {p.variantes.map((v: string) => (
+                          <button
+                            key={v}
+                            onClick={() => handleAddToCart(p, v)}
+                            className="px-3 py-1 bg-stone-800 text-stone-200 text-sm rounded-full hover:bg-amber-600 hover:text-white transition"
+                          >
+                            {v}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   )}
-                  <h3 className="font-bold text-sm truncate">{p.title}</h3>
-                  <p className="text-amber-400 font-bold">{(p.price_cents / 100).toFixed(2)} €</p>
-                  
-                  {/* Affichage de la catégorie et des options */}
-                  {p.categorie && <p className="text-xs text-stone-400">Catégorie : {p.categorie}</p>}
-                  {p.options && <p className="text-xs text-stone-400">Options : {p.options}</p>}
-                  
-                  <p className="text-xs text-stone-500 mb-2">Stock: {p.stock}</p>
-                  <button 
-                    onClick={() => alert(`Ajouté au panier : ${p.title}`)}
-                    className="w-full bg-white text-stone-900 text-xs font-bold py-1.5 rounded hover:bg-stone-200"
-                  >
-                    Ajouter au panier
-                  </button>
+
+                  {/* Si pas de variante, bouton simple */}
+                  {(!p.variantes || p.variantes.length === 0) && (
+                    <button
+                      onClick={() => handleAddToCart(p, "Unique")}
+                      className="w-full bg-white text-stone-900 font-bold py-2 rounded-lg hover:bg-stone-200 transition text-sm"
+                    >
+                      Ajouter au panier
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
