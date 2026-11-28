@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { supabase } from "../../lib/supabase";
+import { supabase } from "../../lib/supabase"; // On garde l'import original
 
 export default function LivePage() {
   const [products, setProducts] = useState<any[]>([]);
